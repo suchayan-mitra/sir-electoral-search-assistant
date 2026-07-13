@@ -11,6 +11,7 @@ import {
   handleImageOptimization,
 } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import gplLicenseText from "../LICENSE?raw";
 import { BrowserSession } from "./browser-session";
 import {
   CloudflareAiNameVariantProvider,
@@ -127,6 +128,16 @@ const worker = {
         },
         410,
       );
+    }
+
+    if (url.pathname === "/LICENSE.txt") {
+      return new Response(gplLicenseText, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=86400",
+          "x-content-type-options": "nosniff",
+        },
+      });
     }
 
     if (url.pathname === "/_vinext/image" && env.IMAGES) {

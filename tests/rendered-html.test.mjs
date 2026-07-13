@@ -56,6 +56,8 @@ test("build contains the Matsetu product shell and extension-only search route",
   assert.doesNotMatch(assistant, /fetch\("\/api\/search"/);
   assert.match(worker, /url\.pathname === "\/api\/search"/);
   assert.match(worker, /url\.pathname === "\/api\/variants"/);
+  assert.match(worker, /url\.pathname === "\/LICENSE\.txt"/);
+  assert.match(worker, /import gplLicenseText from "\.\.\/LICENSE\?raw"/);
   assert.match(worker, /AI_VARIANT_RATE_LIMITER\.limit/);
   assert.match(worker, /extensionRequired: true/);
   assert.doesNotMatch(assistant, /codex-preview|react-loading-skeleton|ChatGPT|mock search/i);
