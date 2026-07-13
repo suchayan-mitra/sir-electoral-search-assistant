@@ -123,7 +123,7 @@ const worker = {
       return apiJson(
         {
           error:
-            "Cloud browser search is disabled. Install the Matsetu browser companion and reload the app.",
+            "Cloud browser search is disabled. Install the SIR Assist browser companion and reload the app.",
           extensionRequired: true,
         },
         410,

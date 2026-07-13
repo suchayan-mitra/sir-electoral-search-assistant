@@ -1,31 +1,31 @@
-# Matsetu
+# SIR Assist
 
-Matsetu is an independent, privacy-minded electoral-search assistant for Karnataka, West Bengal, and Odisha. It generates bounded spelling/transliteration variants and uses a local browser companion to complete a user-approved sequence of human-controlled searches on the official Election Commission of India (ECI) page.
+**SIR Assist — Electoral Search Companion** is an independent, privacy-minded electoral-search assistant for Karnataka, West Bengal, and Odisha. It generates bounded spelling/transliteration variants and uses a local browser companion to complete a user-approved sequence of human-controlled searches on the official Election Commission of India (ECI) page.
 
-Deployed beta: <https://matsetu-electoral-search-assistant.jukulda.workers.dev>
+Deployed beta: <https://sir-electoral-search-assistant.jukulda.workers.dev>
 
-Matsetu is not affiliated with, endorsed by, or operated by ECI. Its minimized summaries are not authoritative voter records.
+SIR Assist is not affiliated with, endorsed by, or operated by ECI. Its minimized summaries are not authoritative voter records.
 
 ## Working flow
 
 1. The web app collects state, name, one or more relative names, exact DOB and/or age alternatives, gender, and optional district.
 2. It generates bounded variants and builds a visible queue of at most eighteen unique name/relative/birth-detail combinations selected by the user.
-3. The installed Matsetu Browser Companion opens the official ECI page and fills the first planned query.
+3. The installed SIR Assist Browser Companion opens the official ECI page and fills the first planned query.
 4. The extension relays the official CAPTCHA image without interpreting it; the user types it and the extension submits once.
-5. Matsetu records the attempt, aggregates and deduplicates minimized candidates, then offers the next approved spelling.
+5. SIR Assist records the attempt, aggregates and deduplicates minimized candidates, then offers the next approved spelling.
 6. Every additional combination starts a fresh official case with a new human CAPTCHA.
 
 The extension never uses OCR, an LLM, a CAPTCHA-solving service, proxying, header evasion, or protected gateway replay.
 
 ## Optional AI variant generation
 
-Deterministic variants remain the default. With explicit UI opt-in, `POST /api/variants` sends only state, voter name and entered relative names to the Matsetu Worker&apos;s Cloudflare Workers AI binding using `@cf/moonshotai/kimi-k2.6`. DOB, ages, gender, district, ECI results and CAPTCHA data are rejected from this boundary. Output is strict JSON, sanitized, grouped under opaque IDs for each relative identity, merged with deterministic variants and hard-capped. The server assigns provenance labels; AI suggestions are unchecked until the user explicitly selects them. The LLM never drives the official page or interprets a CAPTCHA. The legacy `/api/search` cloud-browser route returns HTTP 410 and cannot start Browser Run.
+Deterministic variants remain the default. With explicit UI opt-in, `POST /api/variants` sends only state, voter name and entered relative names to the SIR Assist Worker&apos;s Cloudflare Workers AI binding using `@cf/moonshotai/kimi-k2.6`. DOB, ages, gender, district, ECI results and CAPTCHA data are rejected from this boundary. Output is strict JSON, sanitized, grouped under opaque IDs for each relative identity, merged with deterministic variants and hard-capped. The server assigns provenance labels; AI suggestions are unchecked until the user explicitly selects them. The LLM never drives the official page or interprets a CAPTCHA. The legacy `/api/search` cloud-browser route returns HTTP 410 and cannot start Browser Run.
 
 ## Install the companion
 
-The companion is required for the official-search and CAPTCHA steps. ECI's search runs on its protected webpage with a human challenge; Matsetu does not proxy that search through its server. The extension therefore opens ECI in the user's normal browser, fills exactly one approved attempt, relays the official CAPTCHA for human entry, and returns only a minimized possible-match summary.
+The companion is required for the official-search and CAPTCHA steps. ECI's search runs on its protected webpage with a human challenge; SIR Assist does not proxy that search through its server. The extension therefore opens ECI in the user's normal browser, fills exactly one approved attempt, relays the official CAPTCHA for human entry, and returns only a minimized possible-match summary.
 
-Download `matsetu-browser-companion.zip` from the app, unzip it, then load the folder through Chrome or Edge's **Load unpacked** developer-mode action. Reload any Matsetu tab that was already open after installation. See [`extension/README.md`](extension/README.md) for first-run instructions, requested permissions, and troubleshooting.
+Download `sir-assist-browser-companion.zip` from the app, unzip it, then load the folder through Chrome or Edge's **Load unpacked** developer-mode action. Reload any SIR Assist tab that was already open after installation. See [`extension/README.md`](extension/README.md) for first-run instructions, requested permissions, and troubleshooting.
 
 The unpacked-extension step is for the MVP. A Chrome Web Store release is the appropriate distribution path before broad public use.
 
@@ -43,12 +43,12 @@ npm run lint
 
 `npm run build` deterministically rebuilds the downloadable extension ZIP from an explicit allowlist and includes the complete GPL license. Generated builds, Cloudflare state, screenshots and environment files are not committed.
 
-The production extension is restricted to the deployed Matsetu origin and the official ECI origin. Automated tests do not solve or submit a CAPTCHA. A live end-to-end test requires installing the extension and a person entering the current official challenge.
+The production extension is restricted to the deployed SIR Assist origin and the official ECI origin. Automated tests do not solve or submit a CAPTCHA. A live end-to-end test requires installing the extension and a person entering the current official challenge.
 
 ## Architecture
 
 ```text
-Matsetu web UI on Cloudflare
+SIR Assist web UI on Cloudflare
   -> optional name-only Kimi variant endpoint (explicit opt-in)
   -> local extension bridge
   -> extension background worker (short-lived chrome.storage.session state)
@@ -61,7 +61,7 @@ Matsetu web UI on Cloudflare
 - **Cloudflare Worker:** renders the UI, serves assets, and exposes the opt-in, name-only `/api/variants` Workers AI boundary.
 - **Variant generator:** deterministic logic in `lib/variants.mjs`, optionally augmented by sanitized Kimi suggestions.
 - **Extension transport:** strict same-page message validation in `lib/client/extension-transport.ts`.
-- **Browser companion:** Manifest V3 code in `extension/`, restricted to the exact Matsetu and ECI origins.
+- **Browser companion:** Manifest V3 code in `extension/`, restricted to the exact SIR Assist and ECI origins.
 - **Storage:** transient `chrome.storage.session` state only; CAPTCHA answers are never stored.
 
 ## Privacy and safety guardrails
@@ -83,7 +83,9 @@ npx wrangler deploy --config dist/server/wrangler.json
 
 The extension search does not use Browser Run or Durable Objects. The existing `BrowserSession` class and bindings remain in the Worker only as dormant, non-destructive compatibility resources from the initial deployment; `/api/search` is disabled and cannot invoke them.
 
-Public forks must replace the Matsetu origin in both `extension/manifest.json` and `extension/protocol.js`, run `npm run package:extension`, and deploy under their own Cloudflare account and Worker name. Never reuse another project's Worker, route, domain, Durable Object, or AI rate-limit namespace.
+Deploy SIR Assist only as the `sir-electoral-search-assistant` Worker. The previous project-named Worker is a preserved legacy deployment; do not overwrite or delete it during this rename.
+
+Public forks must replace the SIR Assist origin in both `extension/manifest.json` and `extension/protocol.js`, run `npm run package:extension`, and deploy under their own Cloudflare account and Worker name. Never reuse another project's Worker, route, domain, Durable Object, or AI rate-limit namespace.
 
 ## Public-source policy
 
@@ -94,10 +96,10 @@ Public forks must replace the Matsetu origin in both `extension/manifest.json` a
 
 ## License
 
-Matsetu is free software licensed under the **GNU General Public License, version 3 or any later version** (`GPL-3.0-or-later`). See [LICENSE](LICENSE). Third-party components retain their respective licenses.
+SIR Assist is free software licensed under the **GNU General Public License, version 3 or any later version** (`GPL-3.0-or-later`). See [LICENSE](LICENSE). Third-party components retain their respective licenses.
 
 ## Author and copyright
 
-Matsetu was created and authored by **Suchayan Mitra**, with development assistance from **AI Copilot**.
+SIR Assist was created and authored by **Suchayan Mitra**, with development assistance from **AI Copilot**.
 
 Copyright © 2026 Suchayan Mitra. See [AUTHORS.md](AUTHORS.md) and [NOTICE](NOTICE).

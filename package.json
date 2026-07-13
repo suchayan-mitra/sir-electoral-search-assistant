@@ -1,5 +1,5 @@
 {
-  "name": "matsetu-electoral-search-assistant",
+  "name": "sir-electoral-search-assistant",
   "version": "0.1.0",
   "private": true,
   "description": "Privacy-minded multilingual assistance for human-controlled searches on the official ECI electoral-search service.",
@@ -13,7 +13,14 @@
     }
   ],
   "license": "GPL-3.0-or-later",
-  "homepage": "https://matsetu-electoral-search-assistant.jukulda.workers.dev",
+  "homepage": "https://sir-electoral-search-assistant.jukulda.workers.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suchayan-mitra/sir-electoral-search-assistant.git"
+  },
+  "bugs": {
+    "url": "https://github.com/suchayan-mitra/sir-electoral-search-assistant/issues"
+  },
   "keywords": [
     "electoral-search",
     "transliteration",

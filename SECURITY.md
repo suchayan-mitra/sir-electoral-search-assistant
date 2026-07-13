@@ -13,7 +13,7 @@ Security fixes are applied to the latest version on the default branch. Public f
 - A CAPTCHA is always displayed to and entered by a person.
 - One CAPTCHA permits at most one official submission.
 - Search queues are visible, user-selected, deduplicated, and capped at eighteen.
-- The extension may access only the configured Matsetu origin and official ECI origin.
+- The extension may access only the configured SIR Assist origin and official ECI origin.
 - No cookie, debugger, browsing-history, web-request interception, proxy, or all-sites permission is allowed.
 - Official results remain minimized; sensitive voter fields are neither returned nor stored.
 - Optional AI receives names and state only and never controls the official page.

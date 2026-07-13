@@ -1,19 +1,19 @@
-# Matsetu privacy boundary
+# SIR Assist privacy boundary
 
-Matsetu is designed to help a person try a small, visible set of spelling and birth-detail combinations against the official ECI electoral-search page. It is not a voter-data repository.
+SIR Assist — Electoral Search Companion is designed to help a person try a small, visible set of spelling and birth-detail combinations against the official ECI electoral-search page. It is not a voter-data repository.
 
 ## Data paths
 
 - Deterministic name variants are generated in the web app.
-- Optional AI suggestions send only the selected state, voter name, and entered relative names to the Matsetu Cloudflare Worker and its Workers AI binding.
+- Optional AI suggestions send only the selected state, voter name, and entered relative names to the SIR Assist Cloudflare Worker and its Workers AI binding.
 - DOB, age, gender, district, CAPTCHA data, ECI results, and search selections are rejected from the AI boundary.
-- Official-search details pass locally from the Matsetu page to the browser companion and the ECI tab. They are not sent through the Matsetu Worker.
+- Official-search details pass locally from the SIR Assist page to the browser companion and the ECI tab. They are not sent through the SIR Assist Worker.
 - Extension state uses `chrome.storage.session` and is deleted on completion, failure, cancellation, timeout, or tab closure.
 - CAPTCHA answers are forwarded once to the active ECI tab and are never stored.
 
 ## Result minimization
 
-Matsetu accepts and displays only:
+SIR Assist accepts and displays only:
 
 - display name;
 - age band;

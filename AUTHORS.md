@@ -4,7 +4,7 @@
 
 **Suchayan Mitra**
 
-Matsetu and the Matsetu Browser Companion were created and authored by Suchayan Mitra.
+SIR Assist and the SIR Assist Browser Companion were created and authored by Suchayan Mitra.
 
 ## Development assistance
 

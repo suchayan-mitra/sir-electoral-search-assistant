@@ -6,18 +6,46 @@ import { strFromU8, unzipSync } from "fflate";
 const root = new URL("../", import.meta.url);
 const read = (name) => readFile(new URL(name, root), "utf8");
 
-test("manifest is limited to Matsetu and the official ECI origin", async () => {
+test("manifest is limited to SIR Assist and the official ECI origin", async () => {
   const manifest = JSON.parse(await read("manifest.json"));
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.name, "SIR Assist Browser Companion");
+  assert.equal(manifest.version, "1.1.0");
+  assert.equal(
+    manifest.homepage_url,
+    "https://sir-electoral-search-assistant.jukulda.workers.dev",
+  );
   assert.deepEqual(manifest.host_permissions, [
     "https://electoralsearch.eci.gov.in/*",
   ]);
   assert.deepEqual(manifest.content_scripts[0].matches, [
-    "https://matsetu-electoral-search-assistant.jukulda.workers.dev/*",
+    "https://sir-electoral-search-assistant.jukulda.workers.dev/*",
+  ]);
+  assert.deepEqual(manifest.content_scripts[0].js, [
+    "protocol.js",
+    "sir-assist-bridge.js",
   ]);
   for (const forbidden of ["<all_urls>", "cookies", "debugger", "webRequest"]) {
     assert.equal(JSON.stringify(manifest).includes(forbidden), false);
   }
+});
+
+test("page and extension use the SIR Assist protocol contract", async () => {
+  const [protocol, background, bridge, driver] = await Promise.all([
+    read("protocol.js"),
+    read("background.js"),
+    read("sir-assist-bridge.js"),
+    read("eci-driver.js"),
+  ]);
+  assert.match(protocol, /const CHANNEL = "sir-assist-extension\/v1"/);
+  assert.match(protocol, /globalThis\.SirAssistProtocol/);
+  assert.match(background, /const SESSION_KEY = "sirAssistSessions"/);
+  assert.match(background, /const ALARM_PREFIX = "sir-assist:"/);
+  assert.match(background, /source: "sir-assist-extension"/);
+  assert.match(background, /message\?\.source === "sir-assist-page"/);
+  assert.match(bridge, /source: "sir-assist-page"/);
+  assert.match(bridge, /source === "sir-assist-extension"/);
+  assert.match(driver, /source !== "sir-assist-extension"/);
 });
 
 test("companion uses session-only state and never stores CAPTCHA answers", async () => {
@@ -48,7 +76,7 @@ test("ECI driver fills the official form and minimizes approved fields", async (
 test("no extension source contains CAPTCHA-solving or evasion integrations", async () => {
   const source = (
     await Promise.all(
-      ["background.js", "eci-driver.js", "matsetu-bridge.js"].map(read),
+      ["background.js", "eci-driver.js", "sir-assist-bridge.js"].map(read),
     )
   ).join("\n");
   assert.doesNotMatch(source, /openai|anthropic|ocr|captcha.?solver|proxy|webRequest/i);
@@ -57,7 +85,7 @@ test("no extension source contains CAPTCHA-solving or evasion integrations", asy
 
 test("downloadable companion is an allowlisted GPL source archive", async () => {
   const archive = new Uint8Array(
-    await readFile(new URL("../../public/matsetu-browser-companion.zip", import.meta.url)),
+    await readFile(new URL("../../public/sir-assist-browser-companion.zip", import.meta.url)),
   );
   const files = unzipSync(archive);
   assert.deepEqual(Object.keys(files).sort(), [
@@ -66,13 +94,13 @@ test("downloadable companion is an allowlisted GPL source archive", async () => 
     "background.js",
     "eci-driver.js",
     "manifest.json",
-    "matsetu-bridge.js",
     "protocol.js",
+    "sir-assist-bridge.js",
   ]);
   assert.match(strFromU8(files.LICENSE), /GNU GENERAL PUBLIC LICENSE/);
   assert.match(strFromU8(files["README.md"]), /authored by \*\*Suchayan Mitra\*\*/);
   assert.match(strFromU8(files["README.md"]), /development assistance from \*\*AI Copilot\*\*/);
   assert.match(strFromU8(files["background.js"]), /Copyright \(C\) 2026 Suchayan Mitra/);
   assert.match(strFromU8(files["background.js"]), /Development assistance: AI Copilot/);
-  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.0.2");
+  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.1.0");
 });

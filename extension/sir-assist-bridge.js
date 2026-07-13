@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const protocol = globalThis.MatsetuProtocol;
+  const protocol = globalThis.SirAssistProtocol;
   if (window.top !== window || !protocol.APP_ORIGINS.includes(location.origin)) {
     return;
   }
@@ -56,18 +56,18 @@
     if (serialized.length > 4_096) return;
 
     chrome.runtime
-      .sendMessage({ ...event.data, source: "matsetu-page" })
+      .sendMessage({ ...event.data, source: "sir-assist-page" })
       .then((response) => postToPage(response))
       .catch(() =>
         postToPage({
           type: "ERROR",
           requestId: event.data.requestId,
-          error: "The Matsetu browser companion is unavailable. Reload the page.",
+          error: "The SIR Assist browser companion is unavailable. Reload the page.",
         }),
       );
   });
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.source === "matsetu-extension") postToPage(message);
+    if (message?.source === "sir-assist-extension") postToPage(message);
   });
 })();

@@ -7,7 +7,7 @@
 
 import type { CandidateSummary, SearchRequest } from "../server/official-api-adapter";
 
-export const EXTENSION_CHANNEL = "matsetu-extension/v1";
+export const EXTENSION_CHANNEL = "sir-assist-extension/v1";
 
 export type ExtensionState = "checking" | "available" | "missing";
 

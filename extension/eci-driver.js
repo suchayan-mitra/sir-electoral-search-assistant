@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const protocol = globalThis.MatsetuProtocol;
+  const protocol = globalThis.SirAssistProtocol;
   if (window.top !== window || location.origin !== protocol.ECI_ORIGIN) return;
 
   const stateCodes = {
@@ -188,7 +188,7 @@
   }
 
   chrome.runtime.onMessage.addListener((message) => {
-    if (message?.source !== "matsetu-extension") return;
+    if (message?.source !== "sir-assist-extension") return;
     if (message.type === "FILL") {
       if (
         phase !== "idle" ||

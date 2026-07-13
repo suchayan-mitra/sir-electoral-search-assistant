@@ -1,6 +1,6 @@
-# Contributing to Matsetu
+# Contributing to SIR Assist
 
-Thank you for helping improve Matsetu. Contributions must preserve the project's human-control, privacy, and public-service boundaries.
+Thank you for helping improve SIR Assist — Electoral Search Companion. Contributions must preserve the project's human-control, privacy, and public-service boundaries.
 
 ## Before opening a change
 
@@ -8,7 +8,7 @@ Thank you for helping improve Matsetu. Contributions must preserve the project's
 2. Keep search attempts bounded and explicitly selected by the user.
 3. Do not add CAPTCHA solving, OCR, evasion, proxying, protected API replay, or unbounded automation.
 4. Do not expand extension host permissions or returned voter fields without a documented privacy and security review.
-5. For a fork, replace both hard-coded Matsetu origins in the extension before packaging.
+5. For a fork, replace both hard-coded SIR Assist origins in the extension before packaging.
 
 ## Validate
 

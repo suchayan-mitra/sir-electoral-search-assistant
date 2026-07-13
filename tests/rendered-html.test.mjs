@@ -5,19 +5,19 @@ import { fileURLToPath } from "node:url";
 import { generateVariants, supportedStates, transliterateToStateScript } from "../lib/variants.mjs";
 import { validateSearchInput } from "../lib/server/search-validation.mjs";
 await import("../extension/protocol.js");
-const extensionProtocol = globalThis.MatsetuProtocol;
+const extensionProtocol = globalThis.SirAssistProtocol;
 
 async function source(relativePath) {
   return readFile(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
 }
 
-test("build contains the Matsetu product shell and extension-only search route", async () => {
+test("build contains the SIR Assist product shell and extension-only search route", async () => {
   const [layout, assistant, worker] = await Promise.all([
     source("../app/layout.tsx"),
     source("../app/search-assistant.tsx"),
     source("../worker/index.ts"),
   ]);
-  assert.match(layout, /title = "Matsetu/);
+  assert.match(layout, /title = "SIR Assist/);
   assert.match(assistant, /Find the spelling that finds the record/);
   assert.match(assistant, /Independent beta/);
   assert.match(assistant, /You—not automation—read and type every CAPTCHA/);
@@ -44,7 +44,7 @@ test("build contains the Matsetu product shell and extension-only search route",
   assert.match(assistant, /setSelectedRelatives\(relativeNames\)/);
   assert.match(assistant, /Relative identity · suggestions stay in this group/);
   assert.match(assistant, /Continue to search/);
-  assert.match(assistant, /matsetu-browser-companion\.zip/);
+  assert.match(assistant, /sir-assist-browser-companion\.zip/);
   assert.match(assistant, /GPL-3\.0-or-later · No warranty/);
   assert.doesNotMatch(assistant, /<span>Created by Suchayan Mitra/);
   assert.match(assistant, /possible match.*found/);

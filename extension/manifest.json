@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Matsetu Browser Companion",
-  "version": "1.0.2",
+  "name": "SIR Assist Browser Companion",
+  "version": "1.1.0",
   "description": "Fills one approved ECI search at a time and pauses for a human-entered CAPTCHA.",
-  "homepage_url": "https://matsetu-electoral-search-assistant.jukulda.workers.dev",
+  "homepage_url": "https://sir-electoral-search-assistant.jukulda.workers.dev",
   "permissions": ["alarms", "storage", "tabs"],
   "host_permissions": ["https://electoralsearch.eci.gov.in/*"],
   "background": {
@@ -12,9 +12,9 @@
   "content_scripts": [
     {
       "matches": [
-        "https://matsetu-electoral-search-assistant.jukulda.workers.dev/*"
+        "https://sir-electoral-search-assistant.jukulda.workers.dev/*"
       ],
-      "js": ["protocol.js", "matsetu-bridge.js"],
+      "js": ["protocol.js", "sir-assist-bridge.js"],
       "run_at": "document_start"
     },
     {

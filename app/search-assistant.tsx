@@ -284,9 +284,9 @@ const copy = {
     district: "District",
     optional: "optional",
     continue: "Prepare name variants",
-    privacy: "Your details pass locally to the Matsetu browser companion and the official ECI tab. They are not sent through the Matsetu server.",
+    privacy: "Your details pass locally to the SIR Assist browser companion and the official ECI tab. They are not sent through the SIR Assist server.",
     reviewTitle: "Review spelling variants",
-    reviewCopy: "Select the useful spellings. Matsetu will combine names, relatives and birth details into at most eighteen searches; every official submission pauses for a fresh human CAPTCHA.",
+    reviewCopy: "Select the useful spellings. SIR Assist will combine names, relatives and birth details into at most eighteen searches; every official submission pauses for a fresh human CAPTCHA.",
     nameVariants: "Voter name variants",
     relativeVariants: "Relative-name variants",
     start: "Start controlled search",
@@ -317,9 +317,9 @@ const copy = {
     district: "ಜಿಲ್ಲೆ",
     optional: "ಐಚ್ಛಿಕ",
     continue: "ಹೆಸರು ರೂಪಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಿ",
-    privacy: "ವಿವರಗಳು ನಿಮ್ಮ Matsetu ಬ್ರೌಸರ್ ಕಂಪ್ಯಾನಿಯನ್‌ನಿಂದ ಅಧಿಕೃತ ECI ಟ್ಯಾಬ್‌ಗೆ ನೇರವಾಗಿ ಹೋಗುತ್ತವೆ; Matsetu ಸರ್ವರ್‌ಗೆ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ.",
+    privacy: "ವಿವರಗಳು ನಿಮ್ಮ SIR Assist ಬ್ರೌಸರ್ ಕಂಪ್ಯಾನಿಯನ್‌ನಿಂದ ಅಧಿಕೃತ ECI ಟ್ಯಾಬ್‌ಗೆ ನೇರವಾಗಿ ಹೋಗುತ್ತವೆ; SIR Assist ಸರ್ವರ್‌ಗೆ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ.",
     reviewTitle: "ಕಾಗುಣಿತ ರೂಪಗಳನ್ನು ಪರಿಶೀಲಿಸಿ",
-    reviewCopy: "ಉಪಯುಕ್ತ ಕಾಗುಣಿತಗಳನ್ನು ಆರಿಸಿ. Matsetu ಹದಿನೆಂಟು ಹುಡುಕಾಟ ಸಂಯೋಜನೆಗಳವರೆಗೆ ಸಿದ್ಧಪಡಿಸುತ್ತದೆ; ಪ್ರತಿಯೊಂದಕ್ಕೂ ಹೊಸ CAPTCHA ಅಗತ್ಯ.",
+    reviewCopy: "ಉಪಯುಕ್ತ ಕಾಗುಣಿತಗಳನ್ನು ಆರಿಸಿ. SIR Assist ಹದಿನೆಂಟು ಹುಡುಕಾಟ ಸಂಯೋಜನೆಗಳವರೆಗೆ ಸಿದ್ಧಪಡಿಸುತ್ತದೆ; ಪ್ರತಿಯೊಂದಕ್ಕೂ ಹೊಸ CAPTCHA ಅಗತ್ಯ.",
     nameVariants: "ಮತದಾರರ ಹೆಸರು ರೂಪಗಳು",
     relativeVariants: "ಸಂಬಂಧಿಯ ಹೆಸರು ರೂಪಗಳು",
     start: "ನಿಯಂತ್ರಿತ ಹುಡುಕಾಟ ಪ್ರಾರಂಭಿಸಿ",
@@ -350,9 +350,9 @@ const copy = {
     district: "জেলা",
     optional: "ঐচ্ছিক",
     continue: "নামের বানান তৈরি করুন",
-    privacy: "তথ্য আপনার Matsetu ব্রাউজার কম্প্যানিয়ন থেকে সরাসরি সরকারি ECI ট্যাবে যায়; Matsetu সার্ভারে পাঠানো হয় না।",
+    privacy: "তথ্য আপনার SIR Assist ব্রাউজার কম্প্যানিয়ন থেকে সরাসরি সরকারি ECI ট্যাবে যায়; SIR Assist সার্ভারে পাঠানো হয় না।",
     reviewTitle: "বানানের রূপ যাচাই করুন",
-    reviewCopy: "উপযোগী বানানগুলি বাছুন। Matsetu আঠারোটি পর্যন্ত অনুসন্ধান-সমন্বয় তৈরি করবে; প্রতিটির জন্য নতুন CAPTCHA লাগবে।",
+    reviewCopy: "উপযোগী বানানগুলি বাছুন। SIR Assist আঠারোটি পর্যন্ত অনুসন্ধান-সমন্বয় তৈরি করবে; প্রতিটির জন্য নতুন CAPTCHA লাগবে।",
     nameVariants: "ভোটারের নামের রূপ",
     relativeVariants: "আত্মীয়ের নামের রূপ",
     start: "নিয়ন্ত্রিত অনুসন্ধান শুরু করুন",
@@ -383,9 +383,9 @@ const copy = {
     district: "ଜିଲ୍ଲା",
     optional: "ଇଚ୍ଛାଧୀନ",
     continue: "ନାମର ରୂପ ପ୍ରସ୍ତୁତ କରନ୍ତୁ",
-    privacy: "ତଥ୍ୟ ଆପଣଙ୍କ Matsetu ବ୍ରାଉଜର କମ୍ପାନିଅନରୁ ସିଧାସଳଖ ସରକାରୀ ECI ଟ୍ୟାବକୁ ଯାଏ; Matsetu ସର୍ଭରକୁ ପଠାଯାଏ ନାହିଁ।",
+    privacy: "ତଥ୍ୟ ଆପଣଙ୍କ SIR Assist ବ୍ରାଉଜର କମ୍ପାନିଅନରୁ ସିଧାସଳଖ ସରକାରୀ ECI ଟ୍ୟାବକୁ ଯାଏ; SIR Assist ସର୍ଭରକୁ ପଠାଯାଏ ନାହିଁ।",
     reviewTitle: "ବନାନ ରୂପ ଯାଞ୍ଚ କରନ୍ତୁ",
-    reviewCopy: "ଉପଯୋଗୀ ବନାନଗୁଡ଼ିକ ବାଛନ୍ତୁ। Matsetu ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ସନ୍ଧାନ ସଂଯୋଜନ ପ୍ରସ୍ତୁତ କରିବ; ପ୍ରତ୍ୟେକ ପାଇଁ ନୂଆ CAPTCHA ଆବଶ୍ୟକ।",
+    reviewCopy: "ଉପଯୋଗୀ ବନାନଗୁଡ଼ିକ ବାଛନ୍ତୁ। SIR Assist ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ସନ୍ଧାନ ସଂଯୋଜନ ପ୍ରସ୍ତୁତ କରିବ; ପ୍ରତ୍ୟେକ ପାଇଁ ନୂଆ CAPTCHA ଆବଶ୍ୟକ।",
     nameVariants: "ଭୋଟର ନାମ ରୂପ",
     relativeVariants: "ସମ୍ପର୍କୀୟ ନାମ ରୂପ",
     start: "ନିୟନ୍ତ୍ରିତ ସନ୍ଧାନ ଆରମ୍ଭ କରନ୍ତୁ",
@@ -724,7 +724,7 @@ export function SearchAssistant() {
   function startAttempt(attempt: SearchAttempt, attemptIndex: number) {
     if (extensionState !== "available") {
       setError(
-        "Install the Matsetu browser companion, reload this page, and try again.",
+        "Install the SIR Assist browser companion, reload this page, and try again.",
       );
       return;
     }
@@ -838,10 +838,10 @@ export function SearchAssistant() {
   return (
     <main className="app-shell" lang={locale === "or" ? "or" : locale}>
       <header className="site-header">
-        <div className="brand" aria-label="Matsetu">
-          <span className="brand-mark" aria-hidden="true">ಮ</span>
+        <div className="brand" aria-label="SIR Assist">
+          <span className="brand-mark" aria-hidden="true">S</span>
           <span>
-            <span className="brand-name">Matsetu</span>
+            <span className="brand-name">SIR Assist</span>
             <span className="brand-note">Independent beta · Not an ECI service</span>
           </span>
         </div>
@@ -1138,14 +1138,14 @@ export function SearchAssistant() {
                   </strong>
                   <p>
                     {extensionState === "available"
-                      ? "The selected details go directly from this page to the official ECI tab in your browser—not through the Matsetu server."
+                      ? "The selected details go directly from this page to the official ECI tab in your browser—not through the SIR Assist server."
                       : "Download the extension, unzip it, load the folder as an unpacked extension, then reload this page."}
                   </p>
                   {extensionState === "missing" && (
                     <span className="extension-status-actions">
                       <a
                         className="extension-download"
-                        href="/matsetu-browser-companion.zip"
+                        href="/sir-assist-browser-companion.zip"
                         download
                       >
                         Download browser companion
@@ -1304,7 +1304,7 @@ export function SearchAssistant() {
       </section>
 
       <footer className="footer-note">
-        <span>Matsetu is an independent assistance service and is not affiliated with the Election Commission of India.</span>
+        <span>SIR Assist is an independent assistance service and is not affiliated with the Election Commission of India.</span>
         <span>
           Local browser companion · Human-entered CAPTCHA ·{" "}
           <a href="/LICENSE.txt">GPL-3.0-or-later · No warranty</a>
@@ -1345,7 +1345,7 @@ function ExtensionPreflight({
       {state === "missing" && (
         <div className="extension-first-run">
           <p>
-            <strong>Why it is needed:</strong> ECI requires its real webpage and a human-entered CAPTCHA. Matsetu does not send that search through its server. The companion opens ECI in your browser, fills one approved search, shows the official CAPTCHA here for you to type, and returns only a minimized possible-match summary.
+            <strong>Why it is needed:</strong> ECI requires its real webpage and a human-entered CAPTCHA. SIR Assist does not send that search through its server. The companion opens ECI in your browser, fills one approved search, shows the official CAPTCHA here for you to type, and returns only a minimized possible-match summary.
           </p>
           <p className="extension-guardrail">
             It cannot solve CAPTCHAs, read unrelated websites, access browsing history, or return full voter records.
@@ -1354,10 +1354,10 @@ function ExtensionPreflight({
             <li>Download the browser companion ZIP.</li>
             <li>Unzip the downloaded file.</li>
             <li>Open <code>chrome://extensions</code>, enable <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the unzipped folder.</li>
-            <li>Reload Matsetu and confirm “Browser companion connected”.</li>
+            <li>Reload SIR Assist and confirm “Browser companion connected”.</li>
           </ol>
           <div className="extension-preflight-actions">
-            <a className="extension-download-button" href="/matsetu-browser-companion.zip" download>
+            <a className="extension-download-button" href="/sir-assist-browser-companion.zip" download>
               Download browser companion
             </a>
             <button className="extension-retry" type="button" onClick={onRetry}>

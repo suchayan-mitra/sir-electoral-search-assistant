@@ -12,13 +12,13 @@ import { strToU8, zipSync } from "fflate";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionRoot = resolve(projectRoot, "extension");
-const outputPath = resolve(projectRoot, "public", "matsetu-browser-companion.zip");
+const outputPath = resolve(projectRoot, "public", "sir-assist-browser-companion.zip");
 const publicLicensePath = resolve(projectRoot, "public", "LICENSE.txt");
 const extensionFiles = [
   "manifest.json",
   "background.js",
   "eci-driver.js",
-  "matsetu-bridge.js",
+  "sir-assist-bridge.js",
   "protocol.js",
   "README.md",
 ];

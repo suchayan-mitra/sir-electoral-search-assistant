@@ -8,9 +8,9 @@
 (() => {
   "use strict";
 
-  const CHANNEL = "matsetu-extension/v1";
+  const CHANNEL = "sir-assist-extension/v1";
   const APP_ORIGINS = Object.freeze([
-    "https://matsetu-electoral-search-assistant.jukulda.workers.dev",
+    "https://sir-electoral-search-assistant.jukulda.workers.dev",
   ]);
   const ECI_ORIGIN = "https://electoralsearch.eci.gov.in";
   const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -97,7 +97,7 @@
     );
   }
 
-  globalThis.MatsetuProtocol = Object.freeze({
+  globalThis.SirAssistProtocol = Object.freeze({
     CHANNEL,
     APP_ORIGINS,
     ECI_ORIGIN,

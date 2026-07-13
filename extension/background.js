@@ -7,9 +7,10 @@
 
 importScripts("protocol.js");
 
-const protocol = globalThis.MatsetuProtocol;
+const protocol = globalThis.SirAssistProtocol;
 const ECI_URL = `${protocol.ECI_ORIGIN}/`;
-const SESSION_KEY = "matsetuSessions";
+const SESSION_KEY = "sirAssistSessions";
+const ALARM_PREFIX = "sir-assist:";
 const SESSION_TTL_MS = 90_000;
 const sessions = new Map();
 
@@ -50,7 +51,7 @@ function isEciUrl(value) {
 }
 
 function pageMessage(message) {
-  return { source: "matsetu-extension", ...message };
+  return { source: "sir-assist-extension", ...message };
 }
 
 async function sendToApp(session, message) {
@@ -65,7 +66,7 @@ async function cleanup(requestId, closeOfficial = true) {
   const session = sessions.get(requestId);
   sessions.delete(requestId);
   await persistSessions();
-  await chrome.alarms.clear(`matsetu:${requestId}`);
+  await chrome.alarms.clear(`${ALARM_PREFIX}${requestId}`);
   if (closeOfficial && session?.officialTabId) {
     await chrome.tabs.remove(session.officialTabId).catch(() => undefined);
   }
@@ -108,7 +109,7 @@ async function handleAppMessage(message, sender) {
       return pageMessage({
         type: "ERROR",
         requestId: message.requestId,
-        error: "This Matsetu tab already has an active case.",
+        error: "This SIR Assist tab already has an active case.",
       });
     }
     const officialTab = await chrome.tabs.create({ url: ECI_URL, active: false });
@@ -129,7 +130,7 @@ async function handleAppMessage(message, sender) {
       search: message.search,
     });
     await persistSessions();
-    await chrome.alarms.create(`matsetu:${message.requestId}`, { when: expiresAt });
+    await chrome.alarms.create(`${ALARM_PREFIX}${message.requestId}`, { when: expiresAt });
     return pageMessage({ type: "STARTED", requestId: message.requestId });
   }
 
@@ -165,7 +166,7 @@ async function handleAppMessage(message, sender) {
       await chrome.tabs.sendMessage(
         session.officialTabId,
         {
-          source: "matsetu-extension",
+          source: "sir-assist-extension",
           type: "SUBMIT",
           requestId: message.requestId,
           captchaAnswer: message.captchaAnswer,
@@ -199,7 +200,7 @@ async function handleEciMessage(message, sender) {
 
   if (message.type === "ECI_READY" && session.phase === "opening") {
     await chrome.tabs.sendMessage(session.officialTabId, {
-      source: "matsetu-extension",
+      source: "sir-assist-extension",
       type: "FILL",
       requestId,
       search: session.search,
@@ -264,7 +265,7 @@ async function handleEciMessage(message, sender) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   void (async () => {
     await hydrated;
-    if (message?.source === "matsetu-page") {
+    if (message?.source === "sir-assist-page") {
       return handleAppMessage(message, sender);
     }
     if (message?.source === "eci-driver") {
@@ -286,8 +287,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (!alarm.name.startsWith("matsetu:")) return;
-  const requestId = alarm.name.slice("matsetu:".length);
+  if (!alarm.name.startsWith(ALARM_PREFIX)) return;
+  const requestId = alarm.name.slice(ALARM_PREFIX.length);
   void hydrated.then(async () => {
     const session = sessions.get(requestId);
     if (session) {
@@ -328,7 +329,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const [requestId, session] = sessionEntry;
     await chrome.tabs
       .sendMessage(tabId, {
-        source: "matsetu-extension",
+        source: "sir-assist-extension",
         type: "FILL",
         requestId,
         search: session.search,
