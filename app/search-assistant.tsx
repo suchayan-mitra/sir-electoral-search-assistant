@@ -233,11 +233,11 @@ function parseAgeAlternatives(value: string): number[] | null {
 
 function birthCriteriaFor(form: FormData): BirthCriterion[] {
   const criteria: BirthCriterion[] = [];
-  if (isAdultDob(form.dob)) {
-    criteria.push({ kind: "dob", value: form.dob });
-  }
   for (const age of parseAgeAlternatives(form.age) ?? []) {
     criteria.push({ kind: "age", value: age });
+  }
+  if (isAdultDob(form.dob)) {
+    criteria.push({ kind: "dob", value: form.dob });
   }
   return criteria;
 }
@@ -412,6 +412,19 @@ const defaultForm: FormData = {
   district: "",
 };
 
+const minimumExtensionVersion = "1.2.0";
+
+function isExtensionVersionCurrent(version: string): boolean {
+  const current = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  const minimum = /^(\d+)\.(\d+)\.(\d+)/.exec(minimumExtensionVersion);
+  if (!current || !minimum) return false;
+  for (let index = 1; index <= 3; index += 1) {
+    const difference = Number(current[index]) - Number(minimum[index]);
+    if (difference !== 0) return difference > 0;
+  }
+  return true;
+}
+
 function stepIndex(step: Step) {
   return { details: 0, variants: 1, captcha: 2, results: 3 }[step];
 }
@@ -459,6 +472,34 @@ export function SearchAssistant() {
     () => planSearchQueue(selectedNames, selectedRelatives, birthCriteria, 18),
     [birthCriteria, selectedNames, selectedRelatives],
   );
+  const selectedCombinationCount =
+    selectedNames.length * selectedRelatives.length * birthCriteria.length;
+  const cappedCombinationCount = Math.max(
+    0,
+    selectedCombinationCount - plannedAttempts.length,
+  );
+  const extensionNeedsUpdate =
+    extensionState === "available" &&
+    !isExtensionVersionCurrent(extensionVersion);
+  const extensionReady =
+    extensionState === "available" && !extensionNeedsUpdate;
+  const lastAttemptRecord =
+    attemptHistory.length > 0
+      ? attemptHistory[attemptHistory.length - 1]
+      : undefined;
+  const latestFailure =
+    lastAttemptRecord?.status === "failed" ? lastAttemptRecord : undefined;
+  const completedAttemptCount = attemptHistory.filter(
+    (record) => record.status === "completed",
+  ).length;
+  const completedZeroCount = attemptHistory.filter(
+    (record) => record.status === "completed" && record.candidateCount === 0,
+  ).length;
+  const failedAttemptCount = attemptHistory.filter(
+    (record) => record.status === "failed",
+  ).length;
+  const nextAttemptIndex = activeAttemptIndex + 1;
+  const nextAttempt = searchQueue[nextAttemptIndex];
 
   useEffect(() => {
     const detectionTimeout = window.setTimeout(() => {
@@ -722,9 +763,11 @@ export function SearchAssistant() {
   }
 
   function startAttempt(attempt: SearchAttempt, attemptIndex: number) {
-    if (extensionState !== "available") {
+    if (!extensionReady) {
       setError(
-        "Install the SIR Assist browser companion, reload this page, and try again.",
+        extensionNeedsUpdate
+          ? `Update the SIR Assist browser companion to v${minimumExtensionVersion}, reload this page, and try again.`
+          : "Install the SIR Assist browser companion, reload this page, and try again.",
       );
       return;
     }
@@ -903,6 +946,7 @@ export function SearchAssistant() {
               <ExtensionPreflight
                 state={extensionState}
                 version={extensionVersion}
+                needsUpdate={extensionNeedsUpdate}
                 onRetry={checkExtensionAgain}
               />
 
@@ -983,7 +1027,7 @@ export function SearchAssistant() {
                     maxLength={10}
                   />
                   <small className="field-help">
-                    Use YYYY-MM-DD. Latest adult DOB: {adultDobMaxValue()}.
+                    Use YYYY-MM-DD. When ages are also entered, the exact-age searches run first. Latest adult DOB: {adultDobMaxValue()}.
                   </small>
                 </div>
                 <div className="field">
@@ -1001,7 +1045,9 @@ export function SearchAssistant() {
                     aria-label="Age alternatives"
                     maxLength={24}
                   />
-                  <small className="field-help">Enter up to four ages, separated by commas.</small>
+                  <small className="field-help">
+                    Enter up to four exact age alternatives, separated by commas. Each age is searched separately; this is not an age bracket.
+                  </small>
                 </div>
                 <div className="field">
                   <label htmlFor="gender">{t.gender}</label>
@@ -1062,7 +1108,7 @@ export function SearchAssistant() {
               <h2>{t.reviewTitle}</h2>
               <p className="section-copy">{t.reviewCopy}</p>
               <p className="selection-note">
-                Requesting AI suggestions did not approve them. Only the names you entered are selected; check only local-script or Roman spellings you recognize.
+                Generated spellings are suggestions only. The names you entered are selected by default; only spellings you check are added to the search queue.
               </p>
               {aiVariantOptIn && (
                 <p className={`ai-variant-status ${aiVariantStatus}`} role="status">
@@ -1100,7 +1146,7 @@ export function SearchAssistant() {
               <section className="search-plan" aria-label="Planned official searches">
                 <div className="search-plan-heading">
                   <strong>Planned search queue</strong>
-                  <span>{plannedAttempts.length} of 18 maximum</span>
+                  <span>{plannedAttempts.length} queued · 18 hard maximum</span>
                 </div>
                 {plannedAttempts.length > 0 ? (
                   <ol>
@@ -1119,29 +1165,38 @@ export function SearchAssistant() {
                   <p>Select at least one spelling in each list.</p>
                 )}
                 <p className="search-plan-note">
-                  Each row is a separate official search and requires you to read a new CAPTCHA.
+                  Only checked spellings are queued. Exact ages are tried before DOB when both are entered. Each row is a separate official search and requires a new human-entered CAPTCHA.
                 </p>
+                {cappedCombinationCount > 0 && (
+                  <p className="search-plan-cap" role="status">
+                    18-search cap applied: {cappedCombinationCount} later selected {cappedCombinationCount === 1 ? "combination was" : "combinations were"} not queued. Uncheck lower-priority spellings to bring a preferred combination into the queue.
+                  </p>
+                )}
               </section>
               <div
-                className={`extension-status ${extensionState}`}
+                className={`extension-status ${extensionNeedsUpdate ? "update-required" : extensionState}`}
                 role="status"
                 data-testid="extension-status"
               >
                 <span className="extension-status-dot" aria-hidden="true" />
                 <div>
                   <strong>
-                    {extensionState === "available"
+                    {extensionNeedsUpdate
+                      ? `Browser companion update required · v${minimumExtensionVersion}`
+                      : extensionState === "available"
                       ? `Browser companion connected${extensionVersion ? ` · v${extensionVersion}` : ""}`
                       : extensionState === "checking"
                         ? "Checking browser companion…"
                         : "Browser companion required"}
                   </strong>
                   <p>
-                    {extensionState === "available"
+                    {extensionNeedsUpdate
+                      ? `Version ${extensionVersion || "unknown"} is connected. Install v${minimumExtensionVersion} so failed CAPTCHA submissions and official zero-result responses are reported correctly.`
+                      : extensionState === "available"
                       ? "The selected details go directly from this page to the official ECI tab in your browser—not through the SIR Assist server."
                       : "Download the extension, unzip it, load the folder as an unpacked extension, then reload this page."}
                   </p>
-                  {extensionState === "missing" && (
+                  {(extensionState === "missing" || extensionNeedsUpdate) && (
                     <span className="extension-status-actions">
                       <a
                         className="extension-download"
@@ -1166,13 +1221,13 @@ export function SearchAssistant() {
                   onClick={startSearch}
                   disabled={
                     busy ||
-                    extensionState !== "available" ||
+                    !extensionReady ||
                     plannedAttempts.length === 0
                   }
                   data-testid="start-search"
                 >
                   {busy && <span className="spinner" aria-hidden="true" />}
-                  Start {plannedAttempts.length} planned {plannedAttempts.length === 1 ? "search" : "searches"}<span className="button-arrow" aria-hidden="true">→</span>
+                  Start first of {plannedAttempts.length} planned {plannedAttempts.length === 1 ? "search" : "searches"}<span className="button-arrow" aria-hidden="true">→</span>
                 </button>
               </div>
             </div>
@@ -1199,7 +1254,7 @@ export function SearchAssistant() {
               <span className="human-badge">{t.human}</span>
               {expiresAt && (
                 <p className="session-expiry">
-                  This CAPTCHA expires shortly. Session deadline: {new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.
+                  This CAPTCHA is available for up to three minutes. Submit it promptly; the official page may refresh sooner. Session deadline: {new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.
                 </p>
               )}
               <div className="field">
@@ -1230,24 +1285,53 @@ export function SearchAssistant() {
           {step === "results" && (
             <div className="card-body">
               <p className="section-kicker">Step 4 of 4 · Official search</p>
+              {latestFailure && (
+                <section className="search-failure-alert" role="alert" aria-labelledby="search-failure-heading">
+                  <p>Search {activeAttemptIndex + 1} did not complete</p>
+                  <h2 id="search-failure-heading">No official result was recorded</h2>
+                  <strong>{latestFailure.message ?? "The browser companion could not complete this official search."}</strong>
+                  <span>This is a failed or expired attempt—not a zero-match response from ECI.</span>
+                </section>
+              )}
               <section
-                className={`possible-match-summary ${candidates.length > 0 ? "found" : "empty"}`}
+                className={`possible-match-summary ${candidates.length > 0 ? "found" : latestFailure ? "incomplete" : "empty"}`}
                 aria-labelledby="possible-match-heading"
                 aria-describedby="possible-match-caveat"
               >
-                <p className="possible-match-label">Official ECI response</p>
+                <p className="possible-match-label">
+                  {latestFailure && candidates.length === 0
+                    ? "Completed-search summary"
+                    : "Official ECI response"}
+                </p>
                 <h2 id="possible-match-heading" ref={resultsHeadingRef} tabIndex={-1}>
-                  {candidates.length === 0
-                    ? "No possible matches found yet"
-                    : `${candidates.length} possible ${candidates.length === 1 ? "match" : "matches"} found`}
+                  {candidates.length > 0
+                    ? `${candidates.length} possible ${candidates.length === 1 ? "match" : "matches"} found`
+                    : latestFailure
+                      ? completedAttemptCount > 0
+                        ? `${completedZeroCount} completed ${completedZeroCount === 1 ? "search has" : "searches have"} returned zero`
+                        : "No completed search result yet"
+                      : completedAttemptCount > 0
+                        ? "No possible matches returned so far"
+                        : "No official result yet"}
                 </h2>
                 <p id="possible-match-caveat">
-                  This is not confirmation of identity. Compare the limited details below with what you know, then verify through the official ECI service.
+                  {candidates.length > 0
+                    ? "This is not confirmation of identity. Compare the limited details below with what you know, then verify through the official ECI service."
+                    : latestFailure
+                      ? "Only completed official searches count toward the summary above. Continue with the next criterion or start a new case."
+                      : "A completed zero-result search only describes the exact spelling, relative and birth criterion shown in that attempt. Try another planned combination if available."}
                 </p>
               </section>
+              <div className="search-outcome-totals" aria-label="Search outcome totals">
+                <span><strong>{completedAttemptCount}</strong> completed</span>
+                <span><strong>{completedZeroCount}</strong> completed with zero returned</span>
+                <span><strong>{failedAttemptCount}</strong> failed or expired</span>
+              </div>
               <section className="result-stack" aria-label="Possible match details">
-                {attemptHistory.length > 0 && candidates.length === 0 && (
-                  <p className="empty-result">No matching records have been returned by the completed spellings yet.</p>
+                {lastAttemptRecord?.status === "completed" && candidates.length === 0 && (
+                  <p className="empty-result">
+                    Official search {activeAttemptIndex + 1} completed and returned zero possible matches for this exact combination.
+                  </p>
                 )}
                 {candidates.map((candidate, index) => (
                   <article className="result-card" key={candidate.id} aria-labelledby={`candidate-heading-${index}`}>
@@ -1268,7 +1352,7 @@ export function SearchAssistant() {
                 ))}
               </section>
               <div className="minimized-callout">
-                Privacy guardrail: EPIC number, address, polling station and full voter details are intentionally omitted.
+                Privacy guardrail: a displayed age band is privacy-minimized result information, not the bracket searched. Each entered age was searched as an exact alternative. EPIC number, address, polling station and full voter details are intentionally omitted.
               </div>
               <details className="attempt-progress">
                 <summary>
@@ -1283,8 +1367,11 @@ export function SearchAssistant() {
                       <div>
                         <strong>{record.attempt.name}</strong>
                         <small>
-                          {record.attempt.relativeName} · {formatBirthCriterion(record.attempt.birth)} · {record.status === "completed" ? `${record.candidateCount} returned` : "not completed"}
+                          {record.attempt.relativeName} · {formatBirthCriterion(record.attempt.birth)} · {record.status === "completed" ? `completed · ${record.candidateCount} returned` : "failed · no official result"}
                         </small>
+                        {record.status === "failed" && record.message && (
+                          <small className="attempt-message">{record.message}</small>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -1292,9 +1379,13 @@ export function SearchAssistant() {
               </details>
               <div className="actions">
                 <button className="secondary-button" type="button" onClick={reset}>{t.newSearch}</button>
-                {activeAttemptIndex + 1 < searchQueue.length && (
-                  <button className="primary-button" type="button" onClick={startNextAttempt} disabled={busy}>
-                    Continue to search {activeAttemptIndex + 2}<span className="button-arrow" aria-hidden="true">→</span>
+                {nextAttempt && (
+                  <button className="primary-button next-search-button" type="button" onClick={startNextAttempt} disabled={busy}>
+                    <span>
+                      <strong>Try {formatBirthCriterion(nextAttempt.birth)} next</strong>
+                      <small>{nextAttempt.name} · relative {nextAttempt.relativeName}</small>
+                    </span>
+                    <span className="button-arrow" aria-hidden="true">→</span>
                   </button>
                 )}
               </div>
@@ -1317,31 +1408,52 @@ export function SearchAssistant() {
 function ExtensionPreflight({
   state,
   version,
+  needsUpdate,
   onRetry,
 }: {
   state: ExtensionState;
   version: string;
+  needsUpdate: boolean;
   onRetry: () => void;
 }) {
   return (
-    <section className={`extension-preflight ${state}`} aria-labelledby="extension-preflight-title">
+    <section className={`extension-preflight ${needsUpdate ? "update-required" : state}`} aria-labelledby="extension-preflight-title">
       <div className="extension-preflight-heading">
         <span className="extension-status-dot" aria-hidden="true" />
         <div>
           <h3 id="extension-preflight-title">
-            {state === "available"
+            {needsUpdate
+              ? `Update browser companion to v${minimumExtensionVersion}`
+              : state === "available"
               ? `Browser companion connected${version ? ` · v${version}` : ""}`
               : state === "checking"
                 ? "Checking the browser companion…"
                 : "Install the browser companion before searching"}
           </h3>
           <p role="status" aria-live="polite">
-            {state === "available"
+            {needsUpdate
+              ? `Version ${version || "unknown"} is connected. The update distinguishes failed CAPTCHA submissions from completed zero-result searches.`
+              : state === "available"
               ? "Ready to open the official ECI page locally when you approve a search."
               : "The companion is required only for the official-search and CAPTCHA steps; you can still prepare spelling variants first."}
           </p>
         </div>
       </div>
+      {needsUpdate && (
+        <div className="extension-update">
+          <p>
+            Download and unzip the latest ZIP, replace the existing unpacked folder, open <code>chrome://extensions</code>, click <strong>Reload</strong> for SIR Assist Browser Companion, then reload this page.
+          </p>
+          <div className="extension-preflight-actions">
+            <a className="extension-download-button" href="/sir-assist-browser-companion.zip" download>
+              Download v{minimumExtensionVersion}
+            </a>
+            <button className="extension-retry" type="button" onClick={onRetry}>
+              Check connection again
+            </button>
+          </div>
+        </div>
+      )}
       {state === "missing" && (
         <div className="extension-first-run">
           <p>

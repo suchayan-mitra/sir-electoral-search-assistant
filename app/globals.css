@@ -788,6 +788,16 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.search-plan .search-plan-cap {
+  margin-top: 10px;
+  border-left: 3px solid var(--saffron);
+  border-radius: 7px;
+  color: #70513c;
+  background: var(--saffron-wash);
+  padding: 9px 10px;
+  font-weight: 700;
+}
+
 .attempt-progress {
   margin-bottom: 16px;
 }
@@ -797,6 +807,15 @@ select:focus-visible {
   color: var(--ink-soft);
   font-size: 11px;
   font-weight: 800;
+}
+
+.attempt-progress li small.attempt-message {
+  overflow: visible;
+  margin-top: 2px;
+  color: var(--red);
+  line-height: 1.4;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .search-summary {
@@ -897,6 +916,12 @@ select:focus-visible {
   background: #fff9eb;
 }
 
+.extension-preflight.update-required,
+.extension-status.update-required {
+  border-color: #dfb55c;
+  background: #fff7e3;
+}
+
 .extension-preflight-heading {
   display: flex;
   align-items: flex-start;
@@ -924,10 +949,35 @@ select:focus-visible {
   background: #c78613;
 }
 
+.extension-preflight.update-required .extension-status-dot,
+.extension-status.update-required .extension-status-dot {
+  background: #c78613;
+}
+
 .extension-first-run {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid rgba(199, 134, 19, 0.24);
+}
+
+.extension-update {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(199, 134, 19, 0.24);
+}
+
+.extension-update p {
+  margin: 0;
+  color: #5d4b29;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.extension-update code {
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 1px 4px;
+  font-size: 10px;
 }
 
 .extension-first-run p {
@@ -1077,6 +1127,12 @@ select:focus-visible {
   background: linear-gradient(135deg, var(--teal-wash), #f7fcfa);
 }
 
+.possible-match-summary.incomplete {
+  border-color: #dfb55c;
+  border-left-color: #c78613;
+  background: #fffaf0;
+}
+
 .possible-match-label {
   margin: 0 0 5px;
   color: var(--teal-dark);
@@ -1103,6 +1159,66 @@ select:focus-visible {
   color: var(--ink-soft);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.search-failure-alert {
+  display: grid;
+  gap: 7px;
+  margin-top: 15px;
+  border: 1px solid #d88d84;
+  border-left: 5px solid var(--red);
+  border-radius: 16px;
+  color: #762d26;
+  background: #fff2ef;
+  padding: 18px;
+}
+
+.search-failure-alert p {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.search-failure-alert h2 {
+  color: var(--red);
+  font-size: clamp(23px, 5vw, 31px);
+  line-height: 1.1;
+}
+
+.search-failure-alert strong,
+.search-failure-alert span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.search-failure-alert span {
+  color: #82554f;
+}
+
+.search-outcome-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.search-outcome-totals span {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-soft);
+  background: white;
+  padding: 9px;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.search-outcome-totals strong {
+  color: var(--ink);
+  font-size: 15px;
 }
 
 .empty-result {
@@ -1199,6 +1315,30 @@ select:focus-visible {
   padding: 11px 13px;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.next-search-button {
+  max-width: min(360px, 70%);
+  text-align: left;
+}
+
+.next-search-button > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.next-search-button strong,
+.next-search-button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next-search-button small {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 9px;
+  font-weight: 650;
 }
 
 .footer-note {
@@ -1298,6 +1438,20 @@ select:focus-visible {
   .form-grid,
   .result-meta {
     grid-template-columns: 1fr;
+  }
+
+  .search-outcome-totals {
+    grid-template-columns: 1fr;
+  }
+
+  .actions:has(.next-search-button) {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .next-search-button {
+    width: 100%;
+    max-width: none;
   }
 
   .field.full {

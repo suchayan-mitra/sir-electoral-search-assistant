@@ -10,7 +10,7 @@ test("manifest is limited to SIR Assist and the official ECI origin", async () =
   const manifest = JSON.parse(await read("manifest.json"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.name, "SIR Assist Browser Companion");
-  assert.equal(manifest.version, "1.1.0");
+  assert.equal(manifest.version, "1.2.0");
   assert.equal(
     manifest.homepage_url,
     "https://sir-electoral-search-assistant.jukulda.workers.dev",
@@ -51,6 +51,7 @@ test("page and extension use the SIR Assist protocol contract", async () => {
 test("companion uses session-only state and never stores CAPTCHA answers", async () => {
   const background = await read("background.js");
   assert.match(background, /chrome\.storage\.session/);
+  assert.match(background, /const SESSION_TTL_MS = 180_000/);
   assert.doesNotMatch(background, /storage\.(local|sync)/);
   assert.match(background, /delete session\.search/);
   assert.doesNotMatch(background, /session\.captchaAnswer/);
@@ -102,5 +103,5 @@ test("downloadable companion is an allowlisted GPL source archive", async () => 
   assert.match(strFromU8(files["README.md"]), /development assistance from \*\*AI Copilot\*\*/);
   assert.match(strFromU8(files["background.js"]), /Copyright \(C\) 2026 Suchayan Mitra/);
   assert.match(strFromU8(files["background.js"]), /Development assistance: AI Copilot/);
-  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.1.0");
+  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.2.0");
 });

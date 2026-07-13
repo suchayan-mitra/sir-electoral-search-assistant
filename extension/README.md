@@ -37,12 +37,12 @@ Requested Chrome permissions:
 
 1. SIR Assist displays a user-approved queue capped at eighteen name/relative/birth-detail combinations.
 2. For each attempt, SIR Assist sends one voter-name spelling, one relative-name spelling and exactly one DOB or age criterion to the extension.
-3. The extension opens a background ECI tab and fills the official Search by Details form.
-4. The official CAPTCHA image is relayed to SIR Assist without interpretation.
+3. The extension opens a background ECI tab, fills the official Search by Details form, and verifies that ECI retained the selected fields.
+4. Only after that verification, the official CAPTCHA image is relayed to SIR Assist without interpretation.
 5. The user types the answer in SIR Assist; the extension submits it once to the same ECI tab.
 6. The extension returns minimized candidates, closes the ECI tab, and SIR Assist offers the next approved attempt with a fresh CAPTCHA.
 
-Transient case state uses `chrome.storage.session` and is removed on completion, failure, cancellation, timeout, or tab closure. CAPTCHA answers are forwarded directly and are never stored.
+Transient case state uses `chrome.storage.session` for up to three minutes and is removed on completion, failure, cancellation, timeout, or tab closure. CAPTCHA answers are forwarded directly and are never stored.
 
 ## Building a public fork
 

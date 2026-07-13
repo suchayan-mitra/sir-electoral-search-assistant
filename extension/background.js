@@ -11,7 +11,7 @@ const protocol = globalThis.SirAssistProtocol;
 const ECI_URL = `${protocol.ECI_ORIGIN}/`;
 const SESSION_KEY = "sirAssistSessions";
 const ALARM_PREFIX = "sir-assist:";
-const SESSION_TTL_MS = 90_000;
+const SESSION_TTL_MS = 180_000;
 const sessions = new Map();
 
 const hydrated = chrome.storage.session.get(SESSION_KEY).then((stored) => {

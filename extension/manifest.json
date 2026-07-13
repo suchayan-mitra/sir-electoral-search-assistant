@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SIR Assist Browser Companion",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Fills one approved ECI search at a time and pauses for a human-entered CAPTCHA.",
   "homepage_url": "https://sir-electoral-search-assistant.jukulda.workers.dev",
   "permissions": ["alarms", "storage", "tabs"],

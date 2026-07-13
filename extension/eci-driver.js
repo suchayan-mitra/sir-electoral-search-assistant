@@ -58,6 +58,72 @@
     return districtAliases[normalized] ?? normalized;
   }
 
+  function formMismatch(field) {
+    throw new Error(`The official ECI form did not retain the ${field}. Try this search again.`);
+  }
+
+  function verifyValue(element, expected, field) {
+    if (!element || String(element.value) !== String(expected)) formMismatch(field);
+  }
+
+  function verifyRadio(selected, alternate, field) {
+    if (!selected?.checked || alternate?.checked) formMismatch(field);
+  }
+
+  function verifyOfficialForm(search) {
+    verifyValue(document.querySelector("#stateID"), stateCodes[search.state], "selected state");
+    verifyValue(document.querySelector("#firstNameID"), search.name, "voter name");
+    verifyValue(
+      document.querySelector("#relFirstNameID"),
+      search.relativeName,
+      "relative name",
+    );
+
+    const dobRadio = document.querySelector(
+      'input[type="radio"][name="date"][value="dob"]',
+    );
+    const ageRadio = document.querySelector(
+      'input[type="radio"][name="date"][value="age"]',
+    );
+    if (search.dob) {
+      verifyRadio(dobRadio, ageRadio, "DOB search mode");
+      verifyValue(
+        document.querySelector('input[type="date"][name="date"]'),
+        search.dob,
+        "selected DOB",
+      );
+    } else {
+      verifyRadio(ageRadio, dobRadio, "age search mode");
+      verifyValue(document.querySelector("select#ageID"), search.age, "selected age");
+    }
+
+    const expectedGenderCode = genderCodes[search.gender];
+    const genderRadios = Object.values(genderCodes).map((code) =>
+      document.querySelector(`input[type="radio"][name="gender"][value="${code}"]`),
+    );
+    if (
+      !genderRadios.some(
+        (radio) => radio?.value === expectedGenderCode && radio.checked,
+      ) ||
+      genderRadios.some(
+        (radio) => radio?.value !== expectedGenderCode && radio?.checked,
+      )
+    ) {
+      formMismatch("selected gender");
+    }
+
+    if (search.district) {
+      const district = document.querySelector('select[aria-label="Select District"]');
+      const expected = normalizeDistrict(search.district);
+      const option = [...(district?.options ?? [])].find(
+        (candidate) => normalizeDistrict(candidate.textContent) === expected,
+      );
+      if (!option || String(district.value) !== String(option.value)) {
+        formMismatch("selected district");
+      }
+    }
+  }
+
   async function chooseDistrict(value) {
     const select = await waitFor(() => {
       const element = document.querySelector('select[aria-label="Select District"]');
@@ -118,6 +184,9 @@
     gender.click();
     if (search.district) await chooseDistrict(search.district);
 
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    verifyOfficialForm(search);
+
     const captchaImage = await waitFor(() => {
       const image = document.querySelector('.captcha-div img[src^="data:image/"]');
       const source = image?.getAttribute("src") ?? "";
@@ -168,7 +237,7 @@
     }, 30_000);
     if (outcome.type === "error") {
       throw new Error(
-        "The official site did not accept that CAPTCHA. Start a new case.",
+        "The official site rejected the submission, often because the CAPTCHA expired or was incorrect. Try the next planned search or restart.",
       );
     }
     return outcome.type === "empty" ? [] : parseCandidates(outcome.table);

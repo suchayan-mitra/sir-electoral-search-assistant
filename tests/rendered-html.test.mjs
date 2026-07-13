@@ -31,11 +31,15 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Check connection again/);
   assert.match(assistant, /It cannot solve CAPTCHAs, read unrelated websites/);
   assert.match(assistant, /Planned search queue/);
-  assert.match(assistant, /18 maximum/);
+  assert.match(assistant, /18 hard maximum/);
+  assert.match(assistant, /18-search cap applied/);
   assert.match(assistant, /Send the entered names to AI for better spelling suggestions/);
   assert.match(assistant, /Age alternatives/);
+  assert.match(assistant, /Each age is searched separately; this is not an age bracket/);
+  assert.match(assistant, /Exact ages are tried before DOB/);
   assert.match(assistant, /Other relative-name alternatives/);
-  assert.match(assistant, /Requesting AI suggestions did not approve them/);
+  assert.match(assistant, /Generated spellings are suggestions only/);
+  assert.match(assistant, /only spellings you check are added to the search queue/);
   assert.match(assistant, /Entered by you/);
   assert.match(assistant, /Local transliteration/);
   assert.match(assistant, /AI suggestion/);
@@ -43,12 +47,24 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /setSelectedNames\(uniqueValues\(\[form\.name\.trim\(\)\], 1\)\)/);
   assert.match(assistant, /setSelectedRelatives\(relativeNames\)/);
   assert.match(assistant, /Relative identity · suggestions stay in this group/);
-  assert.match(assistant, /Continue to search/);
+  assert.match(assistant, /Try \{formatBirthCriterion\(nextAttempt\.birth\)\} next/);
+  assert.match(assistant, /nextAttempt\.name\} · relative \{nextAttempt\.relativeName/);
   assert.match(assistant, /sir-assist-browser-companion\.zip/);
+  assert.match(assistant, /minimumExtensionVersion = "1\.2\.0"/);
+  assert.match(assistant, /Browser companion update required/);
+  assert.match(assistant, /!extensionReady/);
+  assert.match(assistant, /available for up to three minutes/);
   assert.match(assistant, /GPL-3\.0-or-later · No warranty/);
   assert.doesNotMatch(assistant, /<span>Created by Suchayan Mitra/);
-  assert.match(assistant, /possible match.*found/);
+  assert.match(assistant, /className="match-badge">Possible match/);
+  assert.match(assistant, /No official result was recorded/);
+  assert.match(assistant, /failed or expired attempt—not a zero-match response/);
+  assert.match(assistant, /latestFailure\.message/);
+  assert.match(assistant, /No possible matches returned so far/);
+  assert.doesNotMatch(assistant, /No possible matches found yet/);
+  assert.match(assistant, /lastAttemptRecord\?\.status === "completed"/);
   assert.match(assistant, /This is not confirmation of identity/);
+  assert.match(assistant, /displayed age band is privacy-minimized result information, not the bracket searched/);
   assert.match(assistant, /Assembly constituency/);
   assert.match(assistant, /Returned by/);
   assert.match(assistant, /resultsHeadingRef\.current\?\.focus/);
@@ -61,6 +77,15 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(worker, /AI_VARIANT_RATE_LIMITER\.limit/);
   assert.match(worker, /extensionRequired: true/);
   assert.doesNotMatch(assistant, /codex-preview|react-loading-skeleton|ChatGPT|mock search/i);
+
+  const ageCriterionPosition = assistant.indexOf(
+    'criteria.push({ kind: "age", value: age })',
+  );
+  const dobCriterionPosition = assistant.indexOf(
+    'criteria.push({ kind: "dob", value: form.dob })',
+  );
+  assert.ok(ageCriterionPosition >= 0);
+  assert.ok(dobCriterionPosition > ageCriterionPosition);
 });
 
 test("extension protocol accepts one selected bounded search", () => {
