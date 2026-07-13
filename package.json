@@ -1,0 +1,65 @@
+{
+  "name": "matsetu-electoral-search-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Privacy-minded multilingual assistance for human-controlled searches on the official ECI electoral-search service.",
+  "author": {
+    "name": "Suchayan Mitra"
+  },
+  "contributors": [
+    {
+      "name": "AI Copilot",
+      "role": "Development assistance"
+    }
+  ],
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://matsetu-electoral-search-assistant.jukulda.workers.dev",
+  "keywords": [
+    "electoral-search",
+    "transliteration",
+    "kannada",
+    "bengali",
+    "odia",
+    "cloudflare-workers",
+    "chrome-extension"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "package:extension": "node scripts/package-extension.mjs",
+    "prebuild": "npm run package:extension",
+    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "test": "npm run build && node --test tests/*.test.mjs extension/tests/*.test.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler"
+  },
+  "dependencies": {
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "^1.1.0",
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "fflate": "^0.8.3",
+    "react-server-dom-webpack": "19.2.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "type": "module"
+}

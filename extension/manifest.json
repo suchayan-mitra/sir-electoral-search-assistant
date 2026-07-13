@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Matsetu Browser Companion",
+  "version": "1.0.2",
+  "description": "Fills one approved ECI search at a time and pauses for a human-entered CAPTCHA.",
+  "homepage_url": "https://matsetu-electoral-search-assistant.jukulda.workers.dev",
+  "permissions": ["alarms", "storage", "tabs"],
+  "host_permissions": ["https://electoralsearch.eci.gov.in/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://matsetu-electoral-search-assistant.jukulda.workers.dev/*"
+      ],
+      "js": ["protocol.js", "matsetu-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://electoralsearch.eci.gov.in/*"],
+      "js": ["protocol.js", "eci-driver.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
