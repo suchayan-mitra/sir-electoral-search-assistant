@@ -13,6 +13,10 @@
     "https://sir-electoral-search-assistant.jukulda.workers.dev",
   ]);
   const ECI_ORIGIN = "https://electoralsearch.eci.gov.in";
+  const ECI_SEARCH_ORIGIN = "https://gateway-voters.eci.gov.in";
+  const ECI_SEARCH_PATH = "/api/v1/elastic/search-by-details-from-state-display-v1";
+  const API_OBSERVER_CONTROL_EVENT = "sir-assist-api-observer-control";
+  const API_OBSERVATION_EVENT = "sir-assist-api-observation";
   const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const STATES = new Set(["karnataka", "west_bengal", "odisha"]);
   const GENDERS = new Set(["female", "male", "other"]);
@@ -24,6 +28,11 @@
     "dob",
     "gender",
     "district",
+  ]);
+  const OFFICIAL_REQUEST_ENVELOPE_KEYS = new Set([
+    "encryptedPayload",
+    "encryptedKey",
+    "iv",
   ]);
 
   function isPlainObject(value) {
@@ -97,15 +106,91 @@
     );
   }
 
+  function exactKeys(value, keys) {
+    if (!isPlainObject(value)) return false;
+    const actual = Object.keys(value);
+    return actual.length === keys.length && actual.every((key) => keys.includes(key));
+  }
+
+  function validKeyName(value) {
+    return typeof value === "string" && /^[A-Za-z_$][A-Za-z0-9_$-]{0,63}$/.test(value);
+  }
+
+  function validSchemaPath(value) {
+    return (
+      typeof value === "string" &&
+      value.length <= 120 &&
+      /^(?:\$|[A-Za-z_$][A-Za-z0-9_$-]{0,63})(?:\[\])?(?:\.(?:[A-Za-z_$][A-Za-z0-9_$-]{0,63})(?:\[\])?)*$/.test(value)
+    );
+  }
+
+  function validStringArray(value, predicate, max = 64) {
+    return (
+      Array.isArray(value) &&
+      value.length <= max &&
+      new Set(value).size === value.length &&
+      value.every(predicate)
+    );
+  }
+
+  function isApiObservation(value) {
+    if (
+      !exactKeys(value, ["transport", "method", "endpoint", "status", "request", "response"]) ||
+      !new Set(["fetch", "xhr"]).has(value.transport) ||
+      value.method !== "POST" ||
+      !Number.isInteger(value.status) ||
+      value.status < 0 ||
+      value.status > 599
+    ) {
+      return false;
+    }
+    if (
+      !exactKeys(value.endpoint, ["origin", "path", "queryKeys"]) ||
+      value.endpoint.origin !== ECI_SEARCH_ORIGIN ||
+      value.endpoint.path !== ECI_SEARCH_PATH ||
+      !validStringArray(value.endpoint.queryKeys, validKeyName, 16) ||
+      value.endpoint.queryKeys.length !== 0
+    ) {
+      return false;
+    }
+    if (
+      !exactKeys(value.request, ["topLevelKeys", "nestedKeys"]) ||
+      !validStringArray(value.request.topLevelKeys, validKeyName, 32) ||
+      !validStringArray(value.request.nestedKeys, validSchemaPath) ||
+      value.request.nestedKeys.length !== 0 ||
+      value.request.topLevelKeys.length !== OFFICIAL_REQUEST_ENVELOPE_KEYS.size ||
+      !value.request.topLevelKeys.every((key) => OFFICIAL_REQUEST_ENVELOPE_KEYS.has(key))
+    ) {
+      return false;
+    }
+    if (
+      !exactKeys(value.response, ["topLevelKeys", "schemaKeys", "arrayLengths"]) ||
+      !Array.isArray(value.response.topLevelKeys) ||
+      value.response.topLevelKeys.length !== 0 ||
+      !Array.isArray(value.response.schemaKeys) ||
+      value.response.schemaKeys.length !== 0 ||
+      !Array.isArray(value.response.arrayLengths) ||
+      value.response.arrayLengths.length !== 0
+    ) {
+      return false;
+    }
+    return true;
+  }
+
   globalThis.SirAssistProtocol = Object.freeze({
     CHANNEL,
     APP_ORIGINS,
     ECI_ORIGIN,
+    ECI_SEARCH_ORIGIN,
+    ECI_SEARCH_PATH,
+    API_OBSERVER_CONTROL_EVENT,
+    API_OBSERVATION_EVENT,
     isPlainObject,
     isRequestId,
     validSearch,
     cleanText,
     ageBand,
     isCaptchaDataImage,
+    isApiObservation,
   });
 })();

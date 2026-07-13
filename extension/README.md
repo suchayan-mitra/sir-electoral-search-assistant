@@ -21,9 +21,11 @@ Cloudflare Workers AI is optional and can suggest name spellings in the web app.
 4. Choose **Load unpacked** and select the unzipped folder containing `manifest.json`.
 5. Reload the SIR Assist page that was already open.
 
+The companion requires Chrome 111 or later (or a compatible Chromium browser) for its narrow main-world content script.
+
 SIR Assist should now show **Browser companion connected**. If it does not, confirm that the extension is enabled, reload the SIR Assist tab, and use **Check connection again**.
 
-The production manifest runs only on the deployed SIR Assist origin and `https://electoralsearch.eci.gov.in/`. It does not request cookies, browsing history, web-request interception, debugger access, or access to unrelated sites.
+The production manifest runs content scripts only on the deployed SIR Assist origin and `https://electoralsearch.eci.gov.in/`. It does not request cookies, browsing history, web-request interception, debugger access, or access to unrelated sites.
 
 Requested Chrome permissions:
 
@@ -41,6 +43,10 @@ Requested Chrome permissions:
 4. Only after that verification, the official CAPTCHA image is relayed to SIR Assist without interpretation.
 5. The user types the answer in SIR Assist; the extension submits it once to the same ECI tab.
 6. The extension returns minimized candidates, closes the ECI tab, and SIR Assist offers the next approved attempt with a fresh CAPTCHA.
+
+After the human authorizes step 5, a document-start script in ECI's page context observes the one official encrypted search request. It uses the page's existing `fetch` and `XMLHttpRequest` calls; it does not replay, alter, decrypt, or proxy them. The observer is dormant before submission, accepts only the exact `POST` to `https://gateway-voters.eci.gov.in/api/v1/elastic/search-by-details-from-state-display-v1`, and disarms after its first matching response.
+
+Only bounded, value-free diagnostics cross the extension bridge: transport, method, exact origin and path, query-key names, HTTP status, and encrypted-envelope key names. Response metadata arrays are required to remain empty; the observer never reads a response body. Headers, sizes, query values, names, relatives, DOB or age values, CAPTCHA data or answers, request bodies, and response bodies never cross the observer event. Diagnostics remain transient and are discarded with the active attempt.
 
 Transient case state uses `chrome.storage.session` for up to three minutes and is removed on completion, failure, cancellation, timeout, or tab closure. CAPTCHA answers are forwarded directly and are never stored.
 

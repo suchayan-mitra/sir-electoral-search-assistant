@@ -50,7 +50,7 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Try \{formatBirthCriterion\(nextAttempt\.birth\)\} next/);
   assert.match(assistant, /nextAttempt\.name\} · relative \{nextAttempt\.relativeName/);
   assert.match(assistant, /sir-assist-browser-companion\.zip/);
-  assert.match(assistant, /minimumExtensionVersion = "1\.2\.0"/);
+  assert.match(assistant, /minimumExtensionVersion = "1\.3\.0"/);
   assert.match(assistant, /Browser companion update required/);
   assert.match(assistant, /!extensionReady/);
   assert.match(assistant, /available for up to three minutes/);
@@ -59,6 +59,16 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /className="match-badge">Possible match/);
   assert.match(assistant, /No official result was recorded/);
   assert.match(assistant, /failed or expired attempt—not a zero-match response/);
+  assert.match(assistant, /Official API call observed/);
+  assert.match(assistant, /human-entered CAPTCHA submission/);
+  assert.match(assistant, /encrypted wire envelope/);
+  assert.match(assistant, /No voter input, CAPTCHA or response body enters this diagnostic/);
+  assert.match(assistant, /metadata is not logged, sent to SIR Assist servers or stored/);
+  assert.match(assistant, /ECI did not return a successful 2xx status/);
+  assert.match(assistant, /not a completed zero-result search/);
+  assert.match(assistant, /message\.type === "API_OBSERVATION"/);
+  assert.match(assistant, /message\.requestId !== submittedCaseRef\.current/);
+  assert.match(assistant, /step === "results"/);
   assert.match(assistant, /latestFailure\.message/);
   assert.match(assistant, /No possible matches returned so far/);
   assert.doesNotMatch(assistant, /No possible matches found yet/);

@@ -19,10 +19,11 @@ SIR Assist page
   -> temporary official ECI tab
   <- official CAPTCHA data image
   -> user-entered answer, forwarded once
+  <- sanitized official search POST metadata
   <- minimized CandidateSummary[]
 ```
 
-The extension keeps short-lived coordination state in `chrome.storage.session`. The answer is forwarded directly and is not added to the stored session. The official tab closes and state is cleared on completion, failure, cancellation, timeout, or tab closure.
+The extension keeps short-lived coordination state in `chrome.storage.session`. The answer is forwarded directly and is not added to the stored session. Immediately before the approved submission, a main-world observer is armed for the exact ECI details-search endpoint. It relays only endpoint, method, status, and encrypted-envelope key names to the app; it does not read the response body or relay request values. The official tab closes and state is cleared on completion, failure, cancellation, timeout, or tab closure.
 
 ## Why the architecture changed
 
@@ -57,5 +58,6 @@ Before broad public use, publish a reviewed extension through an official browse
 5. Verify the app reports the companion version.
 6. Start a synthetic case and stop when the official CAPTCHA image appears in SIR Assist.
 7. A human may enter the challenge for a real authorized search; tests must never solve it automatically.
-8. Verify completion returns only the approved minimized fields, closes the ECI tab, and allows the next queued spelling.
-9. Confirm the visible plan never exceeds eighteen combinations and candidates are deduplicated across attempts.
+8. Verify the app shows an observation of the expected official `POST` and HTTP status using sanitized local metadata, with no CAPTCHA or voter-detail values.
+9. Verify completion returns only the approved minimized fields, closes the ECI tab, and allows the next queued spelling.
+10. Confirm the visible plan never exceeds eighteen combinations and candidates are deduplicated across attempts.

@@ -10,6 +10,7 @@ SIR Assist — Electoral Search Companion is designed to help a person try a sma
 - Official-search details pass locally from the SIR Assist page to the browser companion and the ECI tab. They are not sent through the SIR Assist Worker.
 - Extension state uses `chrome.storage.session` and is deleted on completion, failure, cancellation, timeout, or tab closure.
 - CAPTCHA answers are forwarded once to the active ECI tab and are never stored.
+- Immediately before that one submission, the companion arms a local observer for the exact official details-search endpoint. It relays only the endpoint, method, HTTP status, and encrypted-envelope key names back to the SIR Assist tab. It does not read the response body or relay request values, headers, identifiers, or the CAPTCHA, and nothing from this observation is sent to the SIR Assist Worker or persisted.
 
 ## Result minimization
 

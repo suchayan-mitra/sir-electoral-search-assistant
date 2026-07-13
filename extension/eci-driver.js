@@ -25,6 +25,69 @@
   };
   let activeRequestId = "";
   let phase = "idle";
+  let observerToken = "";
+  let searchApiStatus = null;
+  let searchResponseSettled = false;
+  let observationRelay = Promise.resolve();
+
+  function setObserverEnabled(enabled) {
+    if (!observerToken) return;
+    document.dispatchEvent(
+      new CustomEvent(protocol.API_OBSERVER_CONTROL_EVENT, {
+        detail: JSON.stringify({ enabled, token: observerToken }),
+      }),
+    );
+    if (!enabled) observerToken = "";
+  }
+
+  async function settleObservationRelay() {
+    try {
+      await observationRelay;
+    } catch {
+      throw new Error("The official API response could not be relayed safely.");
+    }
+  }
+
+  document.addEventListener(protocol.API_OBSERVATION_EVENT, (event) => {
+    if (
+      phase !== "submitting" ||
+      !activeRequestId ||
+      !observerToken ||
+      typeof event.detail !== "string" ||
+      event.detail.length > 8_192
+    ) {
+      return;
+    }
+    let envelope;
+    try {
+      envelope = JSON.parse(event.detail);
+    } catch {
+      return;
+    }
+    if (
+      !protocol.isPlainObject(envelope) ||
+      Object.keys(envelope).length !== 2 ||
+      envelope.token !== observerToken ||
+      !protocol.isApiObservation(envelope.observation)
+    ) {
+      return;
+    }
+    searchApiStatus = envelope.observation.status;
+    if (searchApiStatus >= 200 && searchApiStatus < 300) {
+      window.setTimeout(() => {
+        if (phase === "submitting") searchResponseSettled = true;
+      }, 500);
+    }
+    observationRelay = observationRelay.then(() =>
+      chrome.runtime.sendMessage({
+        source: "eci-driver",
+        type: "API_OBSERVATION",
+        requestId: activeRequestId,
+        observation: envelope.observation,
+      }),
+    );
+    setObserverEnabled(false);
+  });
 
   function waitFor(getValue, timeoutMs = 20_000) {
     return new Promise((resolve, reject) => {
@@ -226,16 +289,37 @@
   }
 
   async function waitForResults() {
-    const outcome = await waitFor(() => {
-      if (document.querySelector(".Toastify__toast--error")) return { type: "error" };
-      const table = document.querySelector("table#table-id");
-      if (table) return { type: "table", table };
-      const noResult = [...document.querySelectorAll("h4")].some(
-        (element) => (element.textContent ?? "").trim() === "No Result Found",
-      );
-      return noResult ? { type: "empty" } : null;
-    }, 30_000);
-    if (outcome.type === "error") {
+    let outcome;
+    try {
+      outcome = await waitFor(() => {
+        const spinner = document.querySelector(".globalSpinnerDiv");
+        if (searchApiStatus === null) return null;
+        if (searchApiStatus < 200 || searchApiStatus >= 300) {
+          return { type: "api-error" };
+        }
+        if (
+          spinner ||
+          !searchResponseSettled
+        ) {
+          return null;
+        }
+        if (document.querySelector(".Toastify__toast--error")) return { type: "error" };
+        const table = document.querySelector("table#table-id");
+        if (table) return { type: "table", table };
+        const noResult = [...document.querySelectorAll("h4")].some(
+          (element) => (element.textContent ?? "").trim() === "No Result Found",
+        );
+        return noResult ? { type: "empty" } : null;
+      }, 30_000);
+    } catch (error) {
+      if (searchApiStatus === null) {
+        throw new Error(
+          "The official ECI search API call was not observed, so this attempt was not completed.",
+        );
+      }
+      throw error;
+    }
+    if (outcome.type === "api-error" || outcome.type === "error") {
       throw new Error(
         "The official site rejected the submission, often because the CAPTCHA expired or was incorrect. Try the next planned search or restart.",
       );
@@ -244,6 +328,12 @@
   }
 
   async function reportError(requestId, error) {
+    setObserverEnabled(false);
+    try {
+      await settleObservationRelay();
+    } catch {
+      // The terminal error below is still delivered without any unsafe fallback data.
+    }
     phase = "closed";
     await chrome.runtime.sendMessage({
       source: "eci-driver",
@@ -292,6 +382,9 @@
         return;
       }
       phase = "submitting";
+      searchApiStatus = null;
+      searchResponseSettled = false;
+      observationRelay = Promise.resolve();
       void (async () => {
         const input = await waitFor(() =>
           document.querySelector('input[name="captcha"][aria-label="Enter Captcha"]'),
@@ -300,8 +393,12 @@
           document.querySelector('button[aria-label="Search"]'),
         );
         setNativeValue(input, message.captchaAnswer);
+        observerToken = crypto.randomUUID();
+        setObserverEnabled(true);
         search.click();
         const candidates = await waitForResults();
+        await settleObservationRelay();
+        setObserverEnabled(false);
         phase = "closed";
         await chrome.runtime.sendMessage({
           source: "eci-driver",

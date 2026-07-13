@@ -14,7 +14,8 @@ Security fixes are applied to the latest version on the default branch. Public f
 - One CAPTCHA permits at most one official submission.
 - Search queues are visible, user-selected, deduplicated, and capped at eighteen.
 - The extension may access only the configured SIR Assist origin and official ECI origin.
-- No cookie, debugger, browsing-history, web-request interception, proxy, or all-sites permission is allowed.
+- No cookie, debugger, browsing-history, `webRequest`, proxy, or all-sites permission is allowed.
+- The local observer may run only for the human-authorized submission, must match the exact official search endpoint and encrypted request envelope, and may relay only method, status, and envelope key names. It must not read the response body.
 - Official results remain minimized; sensitive voter fields are neither returned nor stored.
 - Optional AI receives names and state only and never controls the official page.
 

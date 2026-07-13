@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SIR Assist Browser Companion",
-  "version": "1.2.0",
+  "version": "1.3.0",
+  "minimum_chrome_version": "111",
   "description": "Fills one approved ECI search at a time and pauses for a human-entered CAPTCHA.",
   "homepage_url": "https://sir-electoral-search-assistant.jukulda.workers.dev",
   "permissions": ["alarms", "storage", "tabs"],
@@ -16,6 +17,12 @@
       ],
       "js": ["protocol.js", "sir-assist-bridge.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://electoralsearch.eci.gov.in/*"],
+      "js": ["eci-network-observer.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     },
     {
       "matches": ["https://electoralsearch.eci.gov.in/*"],

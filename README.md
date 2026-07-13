@@ -12,8 +12,9 @@ SIR Assist is not affiliated with, endorsed by, or operated by ECI. Its minimize
 2. It generates bounded variants and builds a visible queue of at most eighteen unique name/relative/birth-detail combinations selected by the user.
 3. The installed SIR Assist Browser Companion opens the official ECI page and fills the first planned query.
 4. The extension relays the official CAPTCHA image without interpreting it; the user types it and the extension submits once.
-5. SIR Assist records the attempt, aggregates and deduplicates minimized candidates, then offers the next approved spelling.
-6. Every additional combination starts a fresh official case with a new human CAPTCHA.
+5. After submission, the companion observes whether the official protected search `POST` completed and reports only sanitized network metadata: endpoint, method, HTTP status, and encrypted-envelope key names.
+6. SIR Assist records the attempt, aggregates and deduplicates minimized candidates, then offers the next approved spelling.
+7. Every additional combination starts a fresh official case with a new human CAPTCHA.
 
 The extension never uses OCR, an LLM, a CAPTCHA-solving service, proxying, header evasion, or protected gateway replay.
 
@@ -55,14 +56,17 @@ SIR Assist web UI on Cloudflare
   -> official ECI tab in the user's browser
   <- official CAPTCHA image
   -> human-entered CAPTCHA, one submission
+  <- sanitized official POST metadata (local only)
   <- minimized candidate summaries
 ```
 
 - **Cloudflare Worker:** renders the UI, serves assets, and exposes the opt-in, name-only `/api/variants` Workers AI boundary.
 - **Variant generator:** deterministic logic in `lib/variants.mjs`, optionally augmented by sanitized Kimi suggestions.
 - **Extension transport:** strict same-page message validation in `lib/client/extension-transport.ts`.
-- **Browser companion:** Manifest V3 code in `extension/`, restricted to the exact SIR Assist and ECI origins.
+- **Browser companion:** Manifest V3 code in `extension/`, restricted to the exact SIR Assist and ECI origins. A main-world observer is armed only for the human-authorized submission and reports the endpoint, method, status, and encrypted-envelope key names; it does not read the response body or expose request values.
 - **Storage:** transient `chrome.storage.session` state only; CAPTCHA answers are never stored.
+
+The current protected request contract and the reason a successful network response is required before recording zero matches are documented in [`docs/eci-search-contract.md`](docs/eci-search-contract.md).
 
 ## Privacy and safety guardrails
 
@@ -70,6 +74,7 @@ SIR Assist web UI on Cloudflare
 - Accept exactly one official submission per CAPTCHA-backed case.
 - Show and cap the approved combination queue at eighteen; never run an unbounded Cartesian search.
 - Never log or persist names, relatives, dates of birth, CAPTCHA images/answers, or raw results.
+- Observe only the exact official details-search endpoint after submission, and relay only method, status, and encrypted-envelope key names locally to the app.
 - Return only display name, age band, district, constituency, and fixed match reasons.
 - Omit EPIC number, address, polling station, part/serial details, email, and export.
 - Clear transient state on completion, failure, cancellation, timeout, or tab closure.

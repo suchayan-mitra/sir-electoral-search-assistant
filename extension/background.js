@@ -209,6 +209,15 @@ async function handleEciMessage(message, sender) {
   }
 
   if (message.requestId !== requestId) return undefined;
+  if (message.type === "API_OBSERVATION" && session.phase === "submitting") {
+    if (!protocol.isApiObservation(message.observation)) return undefined;
+    await sendToApp(session, {
+      type: "API_OBSERVATION",
+      requestId,
+      observation: message.observation,
+    });
+    return undefined;
+  }
   if (message.type === "CAPTCHA_READY" && session.phase === "opening") {
     if (
       !protocol.isCaptchaDataImage(message.captchaImage)

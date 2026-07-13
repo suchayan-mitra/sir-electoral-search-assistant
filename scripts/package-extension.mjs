@@ -17,6 +17,7 @@ const publicLicensePath = resolve(projectRoot, "public", "LICENSE.txt");
 const extensionFiles = [
   "manifest.json",
   "background.js",
+  "eci-network-observer.js",
   "eci-driver.js",
   "sir-assist-bridge.js",
   "protocol.js",

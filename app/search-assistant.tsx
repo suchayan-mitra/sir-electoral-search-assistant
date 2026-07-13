@@ -18,6 +18,7 @@ import {
 import {
   parseExtensionMessage,
   sendExtensionMessage,
+  type OfficialApiObservation,
   type ExtensionState,
 } from "@/lib/client/extension-transport";
 import type {
@@ -412,7 +413,7 @@ const defaultForm: FormData = {
   district: "",
 };
 
-const minimumExtensionVersion = "1.2.0";
+const minimumExtensionVersion = "1.3.0";
 
 function isExtensionVersionCurrent(version: string): boolean {
   const current = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
@@ -455,7 +456,10 @@ export function SearchAssistant() {
   const [extensionState, setExtensionState] =
     useState<ExtensionState>("checking");
   const [extensionVersion, setExtensionVersion] = useState("");
+  const [apiObservation, setApiObservation] =
+    useState<OfficialApiObservation | null>(null);
   const activeCaseRef = useRef("");
+  const submittedCaseRef = useRef("");
   const searchQueueRef = useRef<SearchAttempt[]>([]);
   const activeAttemptIndexRef = useRef(-1);
   const startTimeoutRef = useRef<number | null>(null);
@@ -500,6 +504,11 @@ export function SearchAssistant() {
   ).length;
   const nextAttemptIndex = activeAttemptIndex + 1;
   const nextAttempt = searchQueue[nextAttemptIndex];
+  const apiCallAccepted = Boolean(
+    apiObservation &&
+      apiObservation.status >= 200 &&
+      apiObservation.status < 300,
+  );
 
   useEffect(() => {
     const detectionTimeout = window.setTimeout(() => {
@@ -525,6 +534,16 @@ export function SearchAssistant() {
         }
         setExtensionState("available");
         setExtensionVersion(message.version);
+        return;
+      }
+      if (message.type === "API_OBSERVATION") {
+        if (
+          !submittedCaseRef.current ||
+          message.requestId !== submittedCaseRef.current
+        ) {
+          return;
+        }
+        setApiObservation(message.observation);
         return;
       }
       if (
@@ -749,6 +768,8 @@ export function SearchAssistant() {
     activeAttemptIndexRef.current = -1;
     setAttemptHistory([]);
     setCandidates([]);
+    setApiObservation(null);
+    submittedCaseRef.current = "";
     setError("");
     setStep("variants");
   }
@@ -775,6 +796,8 @@ export function SearchAssistant() {
     activeAttemptIndexRef.current = attemptIndex;
     const requestId = crypto.randomUUID();
     activeCaseRef.current = requestId;
+    submittedCaseRef.current = "";
+    setApiObservation(null);
     setCaseId(requestId);
     setBusy(true);
     setError("");
@@ -820,6 +843,7 @@ export function SearchAssistant() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     if (!caseId) return;
+    submittedCaseRef.current = caseId;
     setBusy(true);
     setError("");
     sendExtensionMessage({
@@ -836,10 +860,12 @@ export function SearchAssistant() {
       startTimeoutRef.current = null;
     }
     activeCaseRef.current = "";
+    submittedCaseRef.current = "";
     setCaseId("");
     setCaptchaImage("");
     setCaptchaAnswer("");
     setExpiresAt("");
+    setApiObservation(null);
     setError("");
     setStep(nextStep);
     if (activeCaseId) {
@@ -872,10 +898,12 @@ export function SearchAssistant() {
     setActiveAttemptIndex(-1);
     activeAttemptIndexRef.current = -1;
     setAttemptHistory([]);
+    setApiObservation(null);
     setAiVariantOptIn(false);
     setAiVariantStatus("idle");
     setError("");
     activeCaseRef.current = "";
+    submittedCaseRef.current = "";
   }
 
   return (
@@ -1191,7 +1219,7 @@ export function SearchAssistant() {
                   </strong>
                   <p>
                     {extensionNeedsUpdate
-                      ? `Version ${extensionVersion || "unknown"} is connected. Install v${minimumExtensionVersion} so failed CAPTCHA submissions and official zero-result responses are reported correctly.`
+                      ? `Version ${extensionVersion || "unknown"} is connected. Install v${minimumExtensionVersion} to verify the sanitized official API call after a human CAPTCHA submission.`
                       : extensionState === "available"
                       ? "The selected details go directly from this page to the official ECI tab in your browser—not through the SIR Assist server."
                       : "Download the extension, unzip it, load the folder as an unpacked extension, then reload this page."}
@@ -1291,6 +1319,63 @@ export function SearchAssistant() {
                   <h2 id="search-failure-heading">No official result was recorded</h2>
                   <strong>{latestFailure.message ?? "The browser companion could not complete this official search."}</strong>
                   <span>This is a failed or expired attempt—not a zero-match response from ECI.</span>
+                </section>
+              )}
+              {apiObservation && (
+                <section
+                  className={`official-api-verification ${apiCallAccepted ? "accepted" : "rejected"}`}
+                  aria-labelledby="official-api-verification-heading"
+                  data-testid="official-api-verification"
+                >
+                  <div className="official-api-verification-heading">
+                    <span className="official-api-check" aria-hidden="true">{apiCallAccepted ? "✓" : "!"}</span>
+                    <div>
+                      <p>Local network observation</p>
+                      <h2 id="official-api-verification-heading">Official API call observed</h2>
+                      <strong>
+                        {apiObservation.method} {apiObservation.endpoint.path} · {apiObservation.status === 0 ? "no HTTP status" : `HTTP ${apiObservation.status}`}
+                      </strong>
+                    </div>
+                  </div>
+                  <p className="official-api-privacy">
+                    Observed locally in this browser only after your human-entered CAPTCHA submission. The request uses an encrypted wire envelope. Only the official URL, method, status and encrypted-envelope key names appear here. No voter input, CAPTCHA or response body enters this diagnostic; the metadata is not logged, sent to SIR Assist servers or stored.
+                  </p>
+                  {!apiCallAccepted && (
+                    <p className="official-api-rejection" role="status">
+                      The API call itself was observed, but ECI did not return a successful 2xx status. This attempt is a rejected or interrupted submission—not a completed zero-result search.
+                    </p>
+                  )}
+                  <dl className="official-api-facts">
+                    <div>
+                      <dt>Official origin</dt>
+                      <dd><code>{apiObservation.endpoint.origin}</code></dd>
+                    </div>
+                    <div>
+                      <dt>Transport</dt>
+                      <dd>{apiObservation.transport === "xhr" ? "XMLHttpRequest" : "Fetch"}</dd>
+                    </div>
+                    <div>
+                      <dt>Request envelope</dt>
+                      <dd>{apiObservation.request.topLevelKeys.length} top-level keys · encrypted values withheld</dd>
+                    </div>
+                  </dl>
+                  <details className="official-api-schema">
+                    <summary>Show sanitized schema names</summary>
+                    <dl>
+                      <div>
+                        <dt>Query key names</dt>
+                        <dd>{apiObservation.endpoint.queryKeys.join(", ") || "None"}</dd>
+                      </div>
+                      <div>
+                        <dt>Request envelope key names</dt>
+                        <dd>{apiObservation.request.topLevelKeys.join(", ") || "None"}</dd>
+                      </div>
+                      <div>
+                        <dt>Request nested key names</dt>
+                        <dd>{apiObservation.request.nestedKeys.join(", ") || "None"}</dd>
+                      </div>
+                    </dl>
+                  </details>
                 </section>
               )}
               <section
@@ -1432,7 +1517,7 @@ function ExtensionPreflight({
           </h3>
           <p role="status" aria-live="polite">
             {needsUpdate
-              ? `Version ${version || "unknown"} is connected. The update distinguishes failed CAPTCHA submissions from completed zero-result searches.`
+              ? `Version ${version || "unknown"} is connected. The update verifies sanitized official API metadata after a human CAPTCHA submission.`
               : state === "available"
               ? "Ready to open the official ECI page locally when you approve a search."
               : "The companion is required only for the official-search and CAPTCHA steps; you can still prepare spelling variants first."}

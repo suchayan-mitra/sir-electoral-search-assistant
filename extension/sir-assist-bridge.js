@@ -18,6 +18,7 @@
     "READY",
     "STARTED",
     "CAPTCHA_READY",
+    "API_OBSERVATION",
     "RESULTS",
     "ERROR",
   ]);

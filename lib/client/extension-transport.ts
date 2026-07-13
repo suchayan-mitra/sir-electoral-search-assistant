@@ -8,6 +8,39 @@
 import type { CandidateSummary, SearchRequest } from "../server/official-api-adapter";
 
 export const EXTENSION_CHANNEL = "sir-assist-extension/v1";
+export const OFFICIAL_ECI_API_ORIGIN = "https://gateway-voters.eci.gov.in";
+export const OFFICIAL_ECI_SEARCH_PATH =
+  "/api/v1/elastic/search-by-details-from-state-display-v1";
+const OFFICIAL_REQUEST_ENVELOPE_KEYS = [
+  "encryptedPayload",
+  "encryptedKey",
+  "iv",
+] as const;
+const REQUEST_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const METADATA_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$-]{0,63}$/;
+const SCHEMA_PATH_PATTERN =
+  /^(?:\$|[A-Za-z_$][A-Za-z0-9_$-]{0,63})(?:\[\])?(?:\.(?:[A-Za-z_$][A-Za-z0-9_$-]{0,63})(?:\[\])?)*$/;
+
+export type OfficialApiObservation = {
+  transport: "fetch" | "xhr";
+  method: "POST";
+  endpoint: {
+    origin: typeof OFFICIAL_ECI_API_ORIGIN;
+    path: typeof OFFICIAL_ECI_SEARCH_PATH;
+    queryKeys: string[];
+  };
+  status: number;
+  request: {
+    topLevelKeys: string[];
+    nestedKeys: string[];
+  };
+  response: {
+    topLevelKeys: string[];
+    schemaKeys: string[];
+    arrayLengths: Array<{ path: string; length: number }>;
+  };
+};
 
 export type ExtensionState = "checking" | "available" | "missing";
 
@@ -19,6 +52,11 @@ export type ExtensionToPageMessage =
       requestId: string;
       captchaImage: string;
       expiresAt?: string;
+    }
+  | {
+      type: "API_OBSERVATION";
+      requestId: string;
+      observation: OfficialApiObservation;
     }
   | { type: "RESULTS"; requestId: string; candidates: CandidateSummary[] }
   | { type: "ERROR"; requestId?: string; error: string };
@@ -33,6 +71,147 @@ function cleanText(value: unknown, maxLength = 120): string | null {
   if (typeof value !== "string") return null;
   const cleaned = value.trim().replace(/\s+/g, " ");
   return cleaned && cleaned.length <= maxLength ? cleaned : null;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const actual = Object.keys(value);
+  return (
+    actual.length === expected.length &&
+    actual.every((key) => expected.includes(key))
+  );
+}
+
+function parseMetadataKeys(
+  value: unknown,
+  maxItems: number,
+  kind: "key" | "path" = "key",
+): string[] | null {
+  if (!Array.isArray(value) || value.length > maxItems) return null;
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  for (const key of value) {
+    if (
+      typeof key !== "string" ||
+      key.length < 1 ||
+      key.length > 120 ||
+      !(kind === "path"
+        ? SCHEMA_PATH_PATTERN.test(key)
+        : METADATA_KEY_PATTERN.test(key)) ||
+      seen.has(key)
+    ) {
+      return null;
+    }
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+}
+
+function parseApiObservation(value: unknown): OfficialApiObservation | null {
+  if (!isPlainRecord(value)) return null;
+  if (
+    !hasExactKeys(value, [
+      "transport",
+      "method",
+      "endpoint",
+      "status",
+      "request",
+      "response",
+    ])
+  ) {
+    return null;
+  }
+  const transports = new Set(["fetch", "xhr"]);
+  if (!transports.has(String(value.transport)) || value.method !== "POST") {
+    return null;
+  }
+  if (
+    !Number.isInteger(value.status) ||
+    Number(value.status) < 0 ||
+    Number(value.status) > 599
+  ) {
+    return null;
+  }
+
+  const endpoint = value.endpoint;
+  if (
+    !isPlainRecord(endpoint) ||
+    !hasExactKeys(endpoint, ["origin", "path", "queryKeys"]) ||
+    endpoint.origin !== OFFICIAL_ECI_API_ORIGIN ||
+    endpoint.path !== OFFICIAL_ECI_SEARCH_PATH
+  ) {
+    return null;
+  }
+  const queryKeys = parseMetadataKeys(endpoint.queryKeys, 16);
+  if (!queryKeys || queryKeys.length !== 0) return null;
+
+  const request = value.request;
+  if (
+    !isPlainRecord(request) ||
+    !hasExactKeys(request, ["topLevelKeys", "nestedKeys"])
+  ) {
+    return null;
+  }
+  const requestTopLevelKeys = parseMetadataKeys(request.topLevelKeys, 32);
+  const requestNestedKeys = parseMetadataKeys(request.nestedKeys, 64, "path");
+  if (
+    !requestTopLevelKeys ||
+    !requestNestedKeys ||
+    requestNestedKeys.length !== 0 ||
+    requestTopLevelKeys.length !== OFFICIAL_REQUEST_ENVELOPE_KEYS.length ||
+    !OFFICIAL_REQUEST_ENVELOPE_KEYS.every((key) =>
+      requestTopLevelKeys.includes(key),
+    )
+  ) {
+    return null;
+  }
+
+  const response = value.response;
+  if (
+    !isPlainRecord(response) ||
+    !hasExactKeys(response, ["topLevelKeys", "schemaKeys", "arrayLengths"]) ||
+    !Array.isArray(response.arrayLengths) ||
+    response.arrayLengths.length !== 0
+  ) {
+    return null;
+  }
+  const responseTopLevelKeys = parseMetadataKeys(response.topLevelKeys, 32);
+  const responseSchemaKeys = parseMetadataKeys(response.schemaKeys, 64, "path");
+  if (
+    !responseTopLevelKeys ||
+    !responseSchemaKeys ||
+    responseTopLevelKeys.length !== 0 ||
+    responseSchemaKeys.length !== 0
+  ) return null;
+
+  return {
+    transport: value.transport as OfficialApiObservation["transport"],
+    method: value.method as OfficialApiObservation["method"],
+    endpoint: {
+      origin: OFFICIAL_ECI_API_ORIGIN,
+      path: OFFICIAL_ECI_SEARCH_PATH,
+      queryKeys,
+    },
+    status: Number(value.status),
+    request: {
+      topLevelKeys: requestTopLevelKeys,
+      nestedKeys: requestNestedKeys,
+    },
+    response: {
+      topLevelKeys: responseTopLevelKeys,
+      schemaKeys: responseSchemaKeys,
+      arrayLengths: [],
+    },
+  };
 }
 
 function parseCandidates(value: unknown): CandidateSummary[] | null {
@@ -108,6 +287,26 @@ export function parseExtensionMessage(
         ? { expiresAt: data.expiresAt }
         : {}),
     };
+  }
+  if (data.type === "API_OBSERVATION" && requestId) {
+    if (
+      !REQUEST_ID_PATTERN.test(requestId) ||
+      !hasExactKeys(data, [
+        "channel",
+        "direction",
+        "source",
+        "type",
+        "requestId",
+        "observation",
+      ]) ||
+      data.source !== "sir-assist-extension"
+    ) {
+      return null;
+    }
+    const observation = parseApiObservation(data.observation);
+    return observation
+      ? { type: "API_OBSERVATION", requestId, observation }
+      : null;
   }
   if (data.type === "RESULTS" && requestId) {
     const candidates = parseCandidates(data.candidates);
