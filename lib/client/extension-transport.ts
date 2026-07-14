@@ -58,13 +58,19 @@ export type ExtensionToPageMessage =
       requestId: string;
       observation: OfficialApiObservation;
     }
-  | { type: "RESULTS"; requestId: string; candidates: CandidateSummary[] }
+  | {
+      type: "RESULTS";
+      requestId: string;
+      candidates: CandidateSummary[];
+      resultLimitReached: boolean;
+    }
   | { type: "ERROR"; requestId?: string; error: string };
 
 type PageToExtensionMessage =
   | { type: "PING" }
   | { type: "START"; requestId: string; search: SearchRequest }
   | { type: "SUBMIT"; requestId: string; captchaAnswer: string }
+  | { type: "REFRESH_CAPTCHA"; requestId: string }
   | { type: "CANCEL"; requestId: string };
 
 function cleanText(value: unknown, maxLength = 120): string | null {
@@ -309,8 +315,31 @@ export function parseExtensionMessage(
       : null;
   }
   if (data.type === "RESULTS" && requestId) {
+    if (
+      !REQUEST_ID_PATTERN.test(requestId) ||
+      !hasExactKeys(data, [
+        "channel",
+        "direction",
+        "source",
+        "type",
+        "requestId",
+        "candidates",
+        "resultLimitReached",
+      ]) ||
+      data.source !== "sir-assist-extension" ||
+      typeof data.resultLimitReached !== "boolean"
+    ) {
+      return null;
+    }
     const candidates = parseCandidates(data.candidates);
-    return candidates ? { type: "RESULTS", requestId, candidates } : null;
+    return candidates
+      ? {
+          type: "RESULTS",
+          requestId,
+          candidates,
+          resultLimitReached: data.resultLimitReached,
+        }
+      : null;
   }
   if (data.type === "ERROR") {
     const error = cleanText(data.error, 240);

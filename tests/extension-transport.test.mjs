@@ -81,6 +81,31 @@ function eventFor(observation, overrides = {}) {
   };
 }
 
+function resultsEvent(overrides = {}) {
+  return {
+    source: windowMock,
+    origin: appOrigin,
+    data: {
+      channel: transport.EXTENSION_CHANNEL,
+      direction: "to-page",
+      source: "sir-assist-extension",
+      type: "RESULTS",
+      requestId: "34c1364c-eb60-4384-b8da-4fc5f7815939",
+      candidates: [
+        {
+          displayName: "Example Voter",
+          ageBand: "40–44",
+          district: "Kolkata",
+          constituency: "Example Assembly Constituency",
+          matchedOn: ["selected name", "relative name", "birth detail"],
+        },
+      ],
+      resultLimitReached: false,
+      ...overrides,
+    },
+  };
+}
+
 test("accepts bounded value-free official API metadata", () => {
   assert.deepEqual(
     transport.parseExtensionMessage(eventFor(validObservation())),
@@ -203,6 +228,38 @@ test("rejects observation messages from the wrong page origin or source", () => 
   assert.equal(
     transport.parseExtensionMessage(
       eventFor(validObservation(), { requestId: "not-a-case-id" }),
+    ),
+    null,
+  );
+});
+
+test("accepts only bounded result messages with explicit limit metadata", () => {
+  assert.deepEqual(
+    transport.parseExtensionMessage(resultsEvent()),
+    {
+      type: "RESULTS",
+      requestId: "34c1364c-eb60-4384-b8da-4fc5f7815939",
+      candidates: [
+        {
+          id: "candidate-01",
+          displayName: "Example Voter",
+          match: "possible",
+          ageBand: "40–44",
+          district: "Kolkata",
+          constituency: "Example Assembly Constituency",
+          matchedOn: ["selected name", "relative name", "birth detail"],
+        },
+      ],
+      resultLimitReached: false,
+    },
+  );
+  assert.equal(
+    transport.parseExtensionMessage(resultsEvent({ resultLimitReached: "yes" })),
+    null,
+  );
+  assert.equal(
+    transport.parseExtensionMessage(
+      resultsEvent({ extraResultMetadata: "must not cross" }),
     ),
     null,
   );

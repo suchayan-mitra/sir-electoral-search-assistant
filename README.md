@@ -8,19 +8,21 @@ SIR Assist is not affiliated with, endorsed by, or operated by ECI. Its minimize
 
 ## Working flow
 
-1. The web app collects state, name, one or more relative names, exact DOB and/or age alternatives, gender, and optional district.
-2. It generates bounded variants and builds a visible queue of at most eighteen unique name/relative/birth-detail combinations selected by the user.
+1. The web app collects state, name, one or more relative names, exact DOB and/or age alternatives, gender, and optional district. Users can enter up to seven exact ages or one short inclusive range such as `40-46`; every age remains a separate official search.
+2. Its primary action asks Workers AI for bounded, full-name spelling and transliteration variants; a generic offline transliterator is available as a fallback. The user selects suggestions before a visible queue of at most eighteen combinations is created.
 3. The installed SIR Assist Browser Companion opens the official ECI page and fills the first planned query.
-4. The extension relays the official CAPTCHA image without interpreting it; the user types it and the extension submits once.
-5. After submission, the companion observes whether the official protected search `POST` completed and reports only sanitized network metadata: endpoint, method, HTTP status, and encrypted-envelope key names.
+4. The extension relays the official CAPTCHA image without interpreting it; the user types it and the extension submits once. An unreadable image can be replaced by clicking ECI's own refresh control through the companion, without spending the attempt.
+5. After submission, the companion observes whether the official protected search `POST` completed and reports only sanitized network metadata: endpoint, method, HTTP status, and encrypted-envelope key names. HTTP 429, other 4xx, 5xx and network failures are reported separately.
 6. SIR Assist records the attempt, aggregates and deduplicates minimized candidates, then offers the next approved spelling.
 7. Every additional combination starts a fresh official case with a new human CAPTCHA.
 
 The extension never uses OCR, an LLM, a CAPTCHA-solving service, proxying, header evasion, or protected gateway replay.
 
-## Optional AI variant generation
+## AI-first variant generation
 
-Deterministic variants remain the default. With explicit UI opt-in, `POST /api/variants` sends only state, voter name and entered relative names to the SIR Assist Worker&apos;s Cloudflare Workers AI binding using `@cf/moonshotai/kimi-k2.6`. DOB, ages, gender, district, ECI results and CAPTCHA data are rejected from this boundary. Output is strict JSON, sanitized, grouped under opaque IDs for each relative identity, merged with deterministic variants and hard-capped. The server assigns provenance labels; AI suggestions are unchecked until the user explicitly selects them. The LLM never drives the official page or interprets a CAPTCHA. The legacy `/api/search` cloud-browser route returns HTTP 410 and cannot start Browser Run.
+“Generate AI spelling variants” is the primary action. It sends only the selected state, voter name and entered relative names to the SIR Assist Worker’s Cloudflare Workers AI binding using `@cf/moonshotai/kimi-k2.6`. DOB, ages, gender, district, ECI results and CAPTCHA data are rejected from this boundary. Output is strict JSON, grouped under opaque IDs, and hard-capped. A dictionary-free post-generation validator rejects mixed scripts, unrelated spellings, and added, removed, or reordered Roman name components. The entered value stays first; accepted AI suggestions follow with server-assigned provenance and remain unchecked until the user selects them.
+
+There is no person-specific name dictionary. “Use offline transliteration” performs no AI request and uses only generic character and phonetic rules. The same generic path is shown clearly if AI is unavailable, times out, is rate-limited, or returns invalid output. The LLM never drives the official page or interprets a CAPTCHA. The legacy `/api/search` cloud-browser route returns HTTP 410 and cannot start Browser Run.
 
 ## Install the companion
 
@@ -50,7 +52,8 @@ The production extension is restricted to the deployed SIR Assist origin and the
 
 ```text
 SIR Assist web UI on Cloudflare
-  -> optional name-only Kimi variant endpoint (explicit opt-in)
+  -> primary name-only Kimi variant endpoint (explicit button action)
+  -> generic offline transliteration fallback
   -> local extension bridge
   -> extension background worker (short-lived chrome.storage.session state)
   -> official ECI tab in the user's browser
@@ -60,11 +63,19 @@ SIR Assist web UI on Cloudflare
   <- minimized candidate summaries
 ```
 
-- **Cloudflare Worker:** renders the UI, serves assets, and exposes the opt-in, name-only `/api/variants` Workers AI boundary.
-- **Variant generator:** deterministic logic in `lib/variants.mjs`, optionally augmented by sanitized Kimi suggestions.
+- **Cloudflare Worker:** renders the UI, serves assets, and exposes the bounded, name-only `/api/variants` Workers AI boundary.
+- **Variant generator:** validated AI output is primary. Generic dictionary-free logic in `lib/variants.mjs` is used only for offline or failure fallback.
 - **Extension transport:** strict same-page message validation in `lib/client/extension-transport.ts`.
 - **Browser companion:** Manifest V3 code in `extension/`, restricted to the exact SIR Assist and ECI origins. A main-world observer is armed only for the human-authorized submission and reports the endpoint, method, status, and encrypted-envelope key names; it does not read the response body or expose request values.
 - **Storage:** transient `chrome.storage.session` state only; CAPTCHA answers are never stored.
+
+The companion records a zero-result attempt only after an observed 2xx response and a fresh, structurally stable `No Result Found` state. A result table must contain at least one row and must also be fresh and stable. The ten-summary privacy limit is surfaced explicitly instead of silently implying that all official rows were displayed.
+
+## Official fallback paths
+
+When spelling searches do not find a record, SIR Assist links users directly to the official [ECI Electoral Search](https://electoralsearch.eci.gov.in/) and [ECI electoral-roll download](https://voters.eci.gov.in/download-eroll) pages. West Bengal cases also link to the official [CEO West Bengal SIR 2026](https://ceowestbengal.wb.gov.in/SIR) page, which publishes final-roll and related list links.
+
+ECI's `/searchInSIR/` route searches the older last-SIR roll and uses an opaque route suffix. It must not be described or hard-coded as the West Bengal SIR 2026 final-roll search.
 
 The current protected request contract and the reason a successful network response is required before recording zero matches are documented in [`docs/eci-search-contract.md`](docs/eci-search-contract.md).
 

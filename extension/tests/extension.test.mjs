@@ -10,7 +10,7 @@ test("manifest is limited to SIR Assist and the official ECI origin", async () =
   const manifest = JSON.parse(await read("manifest.json"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.name, "SIR Assist Browser Companion");
-  assert.equal(manifest.version, "1.3.0");
+  assert.equal(manifest.version, "1.5.0");
   assert.equal(manifest.minimum_chrome_version, "111");
   assert.equal(
     manifest.homepage_url,
@@ -56,6 +56,8 @@ test("page and extension use the SIR Assist protocol contract", async () => {
   assert.match(background, /const ALARM_PREFIX = "sir-assist:"/);
   assert.match(background, /source: "sir-assist-extension"/);
   assert.match(background, /message\?\.source === "sir-assist-page"/);
+  assert.match(background, /value\.length > 10/);
+  assert.match(background, /typeof message\.resultLimitReached !== "boolean"/);
   assert.match(bridge, /source: "sir-assist-page"/);
   assert.match(bridge, /source === "sir-assist-extension"/);
   assert.match(driver, /source !== "sir-assist-extension"/);
@@ -64,6 +66,13 @@ test("page and extension use the SIR Assist protocol contract", async () => {
   assert.match(driver, /protocol\.isApiObservation/);
   assert.match(background, /type === "API_OBSERVATION"/);
   assert.match(bridge, /"API_OBSERVATION"/);
+  // The CAPTCHA-refresh relay clicks only the official refresh control and is
+  // limited to the pending-CAPTCHA phase of an existing case.
+  assert.match(bridge, /"REFRESH_CAPTCHA"/);
+  assert.match(background, /type === "REFRESH_CAPTCHA"/);
+  assert.match(background, /session\.phase !== "captcha"/);
+  assert.match(driver, /aria-label="Captcha Refresh"/);
+  assert.doesNotMatch(driver, /getCaptcha/);
 });
 
 test("companion uses session-only state and never stores CAPTCHA answers", async () => {
@@ -89,6 +98,9 @@ test("ECI driver fills the official form and minimizes approved fields", async (
   assert.match(driver, /\.captcha-div img/);
   assert.match(driver, /table#table-id/);
   assert.match(driver, /slice\(0, 10\)/);
+  assert.match(driver, /resultLimitReached: rows\.length >= 10/);
+  assert.match(driver, /RESULT_STABILITY_POLLS = 4/);
+  assert.match(driver, /rate-limited this search \(HTTP 429\)/);
   assert.doesNotMatch(driver, /epicNumber|polling|serialNumber|address/i);
 });
 
@@ -144,5 +156,5 @@ test("downloadable companion is an allowlisted GPL source archive", async () => 
   assert.match(strFromU8(files["README.md"]), /development assistance from \*\*AI Copilot\*\*/);
   assert.match(strFromU8(files["background.js"]), /Copyright \(C\) 2026 Suchayan Mitra/);
   assert.match(strFromU8(files["background.js"]), /Development assistance: AI Copilot/);
-  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.3.0");
+  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.5.0");
 });

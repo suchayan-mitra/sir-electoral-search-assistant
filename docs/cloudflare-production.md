@@ -6,7 +6,7 @@
 - URL: <https://sir-electoral-search-assistant.jukulda.workers.dev>
 - Routing: default isolated `workers.dev` URL only; no custom domain or zone route
 
-Cloudflare serves the SIR Assist — Electoral Search Companion UI, extension archive, and static assets. With explicit AI opt-in, the SIR Assist Worker sends only state and entered names to its Workers AI Kimi binding. DOB, ages, gender, district, electoral results and CAPTCHA data stay outside the AI endpoint. Cloudflare does not drive the official ECI page.
+Cloudflare serves the SIR Assist — Electoral Search Companion UI, extension archive, and static assets. The primary “Generate AI spelling variants” action sends only state and entered names to the Workers AI Kimi binding. The visible offline action sends no names to the Worker. DOB, ages, gender, district, electoral results and CAPTCHA data stay outside the AI endpoint. Cloudflare does not drive the official ECI page.
 
 The previous project-named Worker is a preserved legacy deployment. Renaming to SIR Assist must not overwrite or delete that Worker, its routes, or any unrelated Cloudflare application.
 
@@ -53,7 +53,7 @@ Before broad public use, publish a reviewed extension through an official browse
 
 1. Confirm the public UI and ZIP asset return HTTP 200.
 2. Confirm `/api/search` returns HTTP 410 and cannot launch a cloud browser.
-3. Confirm `/api/variants` rejects non-opt-in or extra fields and uses deterministic fallback on invalid model output.
+3. Confirm `/api/variants` rejects requests without the explicit AI-request flag or with extra fields, prioritizes validated AI output, and uses generic dictionary-free fallback on invalid model output.
 4. Install the reviewed extension and reload the SIR Assist tab.
 5. Verify the app reports the companion version.
 6. Start a synthetic case and stop when the official CAPTCHA image appears in SIR Assist.

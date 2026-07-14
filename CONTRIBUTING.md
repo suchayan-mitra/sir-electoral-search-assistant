@@ -9,6 +9,7 @@ Thank you for helping improve SIR Assist — Electoral Search Companion. Contrib
 3. Do not add CAPTCHA solving, OCR, evasion, proxying, protected API replay, or unbounded automation.
 4. Do not expand extension host permissions or returned voter fields without a documented privacy and security review.
 5. For a fork, replace both hard-coded SIR Assist origins in the extension before packaging.
+6. Do not add person-specific name dictionaries or mappings. Improve the bounded AI prompt, validation, or generic script rules instead.
 
 ## Validate
 

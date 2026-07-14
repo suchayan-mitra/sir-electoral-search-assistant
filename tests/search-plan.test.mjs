@@ -3,8 +3,23 @@ import test from "node:test";
 import {
   deduplicateCandidates,
   isAdultDob,
+  MAX_AGE_ALTERNATIVES,
+  parseAgeAlternatives,
   planSearchQueue,
+  shouldOfferOfficialFallback,
 } from "../lib/search-plan.mjs";
+
+test("expands a bounded inclusive age sweep into exact ages", () => {
+  assert.equal(MAX_AGE_ALTERNATIVES, 7);
+  assert.deepEqual(parseAgeAlternatives("40-46"), [40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(parseAgeAlternatives("40–46"), [40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(parseAgeAlternatives("42, 43; 44/45"), [42, 43, 44, 45]);
+  assert.deepEqual(parseAgeAlternatives("42, 42, 43"), [42, 43]);
+  assert.deepEqual(parseAgeAlternatives(""), []);
+  for (const invalid of ["46-40", "39-46", "40-47", "17-20", "119-121", "40 to 46"]) {
+    assert.equal(parseAgeAlternatives(invalid), null);
+  }
+});
 
 test("plans base, one-side, then combined variants with a hard cap", () => {
   const plan = planSearchQueue(
@@ -109,11 +124,11 @@ test("expands each prioritized spelling pair across DOB and age alternatives", (
 
 test("prioritizes a Bengali combined pair in a capped West Bengal queue", () => {
   const names = [
-    "Suchayan Mitra",
-    "সুচয়ন মিত্র",
-    "Sucayan Mitra",
-    "সুচায়ন মিত্র",
-    "Suchayan Mitro",
+    "Example Elector",
+    "নমুনা ভোটার",
+    "Example Electer",
+    "উদাহরণ ভোটার",
+    "Example Voter",
   ];
   const relatives = [
     "Example Relative",
@@ -139,32 +154,32 @@ test("prioritizes a Bengali combined pair in a capped West Bengal queue", () => 
     })),
     [
       {
-        name: "Suchayan Mitra",
+        name: "Example Elector",
         relativeName: "Example Relative",
         birth: { kind: "age", value: 42 },
       },
       {
-        name: "Suchayan Mitra",
+        name: "Example Elector",
         relativeName: "Example Relative",
         birth: { kind: "age", value: 43 },
       },
       {
-        name: "Suchayan Mitra",
+        name: "Example Elector",
         relativeName: "Example Relative",
         birth: { kind: "dob", value: "1980-01-01" },
       },
       {
-        name: "সুচয়ন মিত্র",
+        name: "নমুনা ভোটার",
         relativeName: "পরীক্ষা আত্মীয়",
         birth: { kind: "age", value: 42 },
       },
       {
-        name: "সুচয়ন মিত্র",
+        name: "নমুনা ভোটার",
         relativeName: "পরীক্ষা আত্মীয়",
         birth: { kind: "age", value: 43 },
       },
       {
-        name: "সুচয়ন মিত্র",
+        name: "নমুনা ভোটার",
         relativeName: "পরীক্ষা আত্মীয়",
         birth: { kind: "dob", value: "1980-01-01" },
       },
@@ -187,10 +202,194 @@ test("prioritizes a Bengali combined pair in a capped West Bengal queue", () => 
   assert.ok(
     plan.some(
       ({ name, relativeName }) =>
-        name === "সুচয়ন মিত্র" && relativeName === "পরীক্ষা আত্মীয়",
+        name === "নমুনা ভোটার" && relativeName === "পরীক্ষা আত্মীয়",
     ),
   );
   assert.deepEqual(plan, planSearchQueue(names, relatives, criteria, 18));
+});
+
+test("keeps a seven-age sweep, DOB and local-script pair inside the eighteen-search cap", () => {
+  const criteria = [
+    ...parseAgeAlternatives("40-46").map((age) => ({
+      kind: "age",
+      value: age,
+    })),
+    { kind: "dob", value: "1980-01-01" },
+  ];
+  const plan = planSearchQueue(
+    ["Example Elector", "নমুনা ভোটার", "Example Electer"],
+    ["Primary Relative", "প্রথম আত্মীয়", "প্রথম আত্মিয়"],
+    criteria,
+    18,
+  );
+
+  assert.equal(plan.length, 18);
+  assert.deepEqual(
+    plan.slice(0, 8).map(({ birth }) => `${birth.kind}:${birth.value}`),
+    [
+      "age:40",
+      "age:41",
+      "age:42",
+      "age:43",
+      "age:44",
+      "age:45",
+      "age:46",
+      "dob:1980-01-01",
+    ],
+  );
+  assert.deepEqual(
+    plan.slice(8, 16).map(({ name, relativeName, birth }) => ({
+      name,
+      relativeName,
+      criterion: `${birth.kind}:${birth.value}`,
+    })),
+    [
+      "age:40",
+      "age:41",
+      "age:42",
+      "age:43",
+      "age:44",
+      "age:45",
+      "age:46",
+      "dob:1980-01-01",
+    ].map((criterion) => ({
+      name: "নমুনা ভোটার",
+      relativeName: "প্রথম আত্মীয়",
+      criterion,
+    })),
+  );
+});
+
+test("covers each entered relative identity before variant sweeps consume the cap", () => {
+  const criteria = [
+    ...parseAgeAlternatives("40-46").map((age) => ({
+      kind: "age",
+      value: age,
+    })),
+    { kind: "dob", value: "1980-01-01" },
+  ];
+  const primaryRelative = "Primary Relative";
+  const secondRelative = "Second Relative";
+  const plan = planSearchQueue(
+    ["Example Elector", "নমুনা ভোটার"],
+    [
+      primaryRelative,
+      secondRelative,
+      "প্রথম আত্মীয়",
+      "দ্বিতীয় আত্মীয়",
+    ],
+    criteria,
+    18,
+    {
+      relativeIdentityValues: [
+        primaryRelative,
+        secondRelative,
+      ],
+    },
+  );
+
+  assert.equal(plan.length, 18);
+  assert.deepEqual(
+    plan.slice(0, 2).map(({ name, relativeName, birth }) => ({
+      name,
+      relativeName,
+      criterion: `${birth.kind}:${birth.value}`,
+    })),
+    [primaryRelative, secondRelative].map((relativeName) => ({
+      name: "Example Elector",
+      relativeName,
+      criterion: "age:40",
+    })),
+  );
+  const remainingCriteria = [
+    "age:40",
+    "age:41",
+    "age:42",
+    "age:43",
+    "age:44",
+    "age:45",
+    "age:46",
+    "dob:1980-01-01",
+  ].slice(1);
+  assert.deepEqual(
+    plan.slice(2, 9).map(({ relativeName, birth }) => ({
+      relativeName,
+      criterion: `${birth.kind}:${birth.value}`,
+    })),
+    remainingCriteria.map((criterion) => ({
+      relativeName: primaryRelative,
+      criterion,
+    })),
+  );
+  assert.deepEqual(
+    plan.slice(9, 16).map(({ relativeName, birth }) => ({
+      relativeName,
+      criterion: `${birth.kind}:${birth.value}`,
+    })),
+    remainingCriteria.map((criterion) => ({
+      relativeName: secondRelative,
+      criterion,
+    })),
+  );
+  assert.deepEqual(
+    plan.slice(16).map(({ name, relativeName, birth }) => ({
+      name,
+      relativeName,
+      criterion: `${birth.kind}:${birth.value}`,
+    })),
+    [
+      {
+        name: "নমুনা ভোটার",
+        relativeName: "প্রথম আত্মীয়",
+        criterion: "age:40",
+      },
+      {
+        name: "নমুনা ভোটার",
+        relativeName: "প্রথম আত্মীয়",
+        criterion: "age:41",
+      },
+    ],
+  );
+});
+
+test("offers official fallbacks only after an exhausted completed no-match queue", () => {
+  assert.equal(
+    shouldOfferOfficialFallback({
+      candidateCount: 0,
+      attemptedCount: 3,
+      completedAttemptCount: 3,
+      plannedAttemptCount: 3,
+    }),
+    true,
+  );
+  for (const state of [
+    {
+      candidateCount: 1,
+      attemptedCount: 3,
+      completedAttemptCount: 3,
+      plannedAttemptCount: 3,
+    },
+    {
+      candidateCount: 0,
+      attemptedCount: 2,
+      completedAttemptCount: 2,
+      plannedAttemptCount: 3,
+    },
+    {
+      candidateCount: 0,
+      attemptedCount: 3,
+      completedAttemptCount: 2,
+      plannedAttemptCount: 3,
+    },
+    {
+      candidateCount: 0,
+      attemptedCount: 0,
+      completedAttemptCount: 0,
+      plannedAttemptCount: 0,
+    },
+  ]) {
+    assert.equal(shouldOfferOfficialFallback(state), false);
+  }
 });
 
 test("rejects invalid birth criteria and caps expanded queues at eighteen", () => {

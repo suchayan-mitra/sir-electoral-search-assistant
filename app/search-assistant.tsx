@@ -13,7 +13,10 @@ import {
   deduplicateCandidates,
   formatBirthCriterion,
   isAdultDob,
+  MAX_AGE_ALTERNATIVES,
+  parseAgeAlternatives,
   planSearchQueue,
+  shouldOfferOfficialFallback,
 } from "@/lib/search-plan.mjs";
 import {
   parseExtensionMessage,
@@ -34,6 +37,7 @@ type AttemptRecord = {
   attempt: SearchAttempt;
   status: "completed" | "failed";
   candidateCount: number;
+  apiStatus?: number;
   message?: string;
 };
 
@@ -52,7 +56,13 @@ type BirthCriterion =
   | { kind: "dob"; value: string }
   | { kind: "age"; value: number };
 
-type AiVariantStatus = "idle" | "loading" | "generated" | "fallback" | "not_configured";
+type AiVariantStatus =
+  | "idle"
+  | "loading"
+  | "generated"
+  | "fallback"
+  | "not_configured"
+  | "offline";
 
 type VariantSuggestionResponse = {
   voterNameVariants?: unknown;
@@ -156,12 +166,16 @@ function normalizeCandidateList(
   limit: number,
 ): VariantCandidate[] {
   const local = localCandidates(enteredValue, state, limit);
-  const localByValue = new Map(
-    local.map((candidate) => [candidate.value.toLocaleLowerCase(), candidate]),
-  );
   const values = Array.isArray(raw) ? raw : [];
+  const candidates = values.length > 0 ? [local[0], ...values] : local;
+  const enteredKey = local[0]?.value.toLocaleLowerCase();
+  const allowedSources = new Set<VariantSource>([
+    "ai",
+    "local-spelling",
+    "local-transliteration",
+  ]);
   const merged = new Map<string, VariantCandidate>();
-  for (const candidate of [local[0], ...values, ...local.slice(1)]) {
+  for (const candidate of candidates) {
     const rawValue =
       candidate && typeof candidate === "object" && "value" in candidate
         ? candidate.value
@@ -174,14 +188,18 @@ function normalizeCandidateList(
       .slice(0, 80);
     const key = value.toLocaleLowerCase();
     if (!value || merged.has(key)) continue;
-    const knownLocal = localByValue.get(key);
-    merged.set(
-      key,
-      knownLocal ?? {
-        value,
-        source: "ai",
-      },
-    );
+    const rawSource =
+      candidate && typeof candidate === "object" && "source" in candidate
+        ? candidate.source
+        : undefined;
+    const source: VariantSource =
+      key === enteredKey
+        ? "entered"
+        : typeof rawSource === "string" &&
+            allowedSources.has(rawSource as VariantSource)
+          ? (rawSource as VariantSource)
+          : "ai";
+    merged.set(key, { value, source });
     if (merged.size >= limit) break;
   }
   return [...merged.values()];
@@ -219,26 +237,15 @@ function normalizeRelativeGroups(
   });
 }
 
-function parseAgeAlternatives(value: string): number[] | null {
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-  if (!/^\d{1,3}(?:\s*[,;/]\s*\d{1,3}){0,3}$/.test(trimmed)) {
-    return null;
-  }
-  const ages = trimmed.split(/\s*[,;/]\s*/).map(Number);
-  if (ages.some((age) => !Number.isInteger(age) || age < 18 || age > 120)) {
-    return null;
-  }
-  return [...new Set(ages)];
-}
-
 function birthCriteriaFor(form: FormData): BirthCriterion[] {
   const criteria: BirthCriterion[] = [];
-  for (const age of parseAgeAlternatives(form.age) ?? []) {
-    criteria.push({ kind: "age", value: age });
-  }
+  // A known DOB is the strongest birth criterion, so it must consume the first
+  // CAPTCHA-backed attempt; guessed ages only run after it.
   if (isAdultDob(form.dob)) {
     criteria.push({ kind: "dob", value: form.dob });
+  }
+  for (const age of parseAgeAlternatives(form.age) ?? []) {
+    criteria.push({ kind: "age", value: age });
   }
   return criteria;
 }
@@ -284,8 +291,9 @@ const copy = {
     gender: "Gender",
     district: "District",
     optional: "optional",
-    continue: "Prepare name variants",
-    privacy: "Your details pass locally to the SIR Assist browser companion and the official ECI tab. They are not sent through the SIR Assist server.",
+    continue: "Generate AI spelling variants",
+    offline: "Use offline transliteration",
+    privacy: "This sends only the selected state and entered names to SIR Assist AI. DOB, age, gender, district, CAPTCHA and ECI results are not sent to AI.",
     reviewTitle: "Review spelling variants",
     reviewCopy: "Select the useful spellings. SIR Assist will combine names, relatives and birth details into at most eighteen searches; every official submission pauses for a fresh human CAPTCHA.",
     nameVariants: "Voter name variants",
@@ -300,6 +308,30 @@ const copy = {
     resultsTitle: "Possible matches",
     resultsCopy: "These minimized matches came from the official ECI search. Open the official service if you need to verify more detail.",
     newSearch: "Start a new case",
+    how: {
+      title: "Who does what",
+      roles: [
+        {
+          title: "SIR Assist cloud (Cloudflare Worker)",
+          body: "Hosts this page and the extension download, and generates bounded AI spelling suggestions from only the selected state and entered names. It never receives DOB, age, gender, district, CAPTCHA data or ECI results, and it never searches ECI itself.",
+        },
+        {
+          title: "Browser companion (extension)",
+          body: "Opens the official ECI page in your browser, fills one approved combination, relays the untouched CAPTCHA image, submits exactly once, and returns a minimized possible-match summary. Search details travel locally from this page to the ECI tab—never through SIR Assist servers.",
+        },
+        {
+          title: "You (human)",
+          body: "Read and type every CAPTCHA, approve every combination before it runs, and verify any possible match on the official ECI service.",
+        },
+      ],
+      limitsTitle: "What cannot be bypassed",
+      limits: [
+        "Every submitted combination requires a fresh human-entered CAPTCHA. AI cannot solve, reuse or remove it.",
+        "ECI rate limits, outages, and inaccurate or missing electoral data remain outside SIR Assist's control.",
+        "A possible match is not identity confirmation—verify it on the official service.",
+        "A zero result only covers the exact combinations tried; it does not prove the person is absent from the roll.",
+      ],
+    },
   },
   kn: {
     eyebrow: "ಬಹುಭಾಷಾ ಮತದಾರರ ಹುಡುಕಾಟ ಸಹಾಯ",
@@ -317,8 +349,9 @@ const copy = {
     gender: "ಲಿಂಗ",
     district: "ಜಿಲ್ಲೆ",
     optional: "ಐಚ್ಛಿಕ",
-    continue: "ಹೆಸರು ರೂಪಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಿ",
-    privacy: "ವಿವರಗಳು ನಿಮ್ಮ SIR Assist ಬ್ರೌಸರ್ ಕಂಪ್ಯಾನಿಯನ್‌ನಿಂದ ಅಧಿಕೃತ ECI ಟ್ಯಾಬ್‌ಗೆ ನೇರವಾಗಿ ಹೋಗುತ್ತವೆ; SIR Assist ಸರ್ವರ್‌ಗೆ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ.",
+    continue: "AI ಹೆಸರು ರೂಪಗಳನ್ನು ರಚಿಸಿ",
+    offline: "ಆಫ್‌ಲೈನ್ ಲಿಪ್ಯಂತರ ಬಳಸಿ",
+    privacy: "ಕಾಗುಣಿತ ರೂಪಗಳನ್ನು ರಚಿಸಲು ಆಯ್ದ ರಾಜ್ಯ ಮತ್ತು ನಮೂದಿಸಿದ ಹೆಸರುಗಳನ್ನು ಮಾತ್ರ SIR Assist AI ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ. ಜನ್ಮ ದಿನಾಂಕ, ವಯಸ್ಸು, ಲಿಂಗ, ಜಿಲ್ಲೆ, CAPTCHA ಮತ್ತು ECI ಫಲಿತಾಂಶಗಳನ್ನು AI ಗೆ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ.",
     reviewTitle: "ಕಾಗುಣಿತ ರೂಪಗಳನ್ನು ಪರಿಶೀಲಿಸಿ",
     reviewCopy: "ಉಪಯುಕ್ತ ಕಾಗುಣಿತಗಳನ್ನು ಆರಿಸಿ. SIR Assist ಹದಿನೆಂಟು ಹುಡುಕಾಟ ಸಂಯೋಜನೆಗಳವರೆಗೆ ಸಿದ್ಧಪಡಿಸುತ್ತದೆ; ಪ್ರತಿಯೊಂದಕ್ಕೂ ಹೊಸ CAPTCHA ಅಗತ್ಯ.",
     nameVariants: "ಮತದಾರರ ಹೆಸರು ರೂಪಗಳು",
@@ -333,6 +366,30 @@ const copy = {
     resultsTitle: "ಸಂಭಾವ್ಯ ಹೊಂದಾಣಿಕೆಗಳು",
     resultsCopy: "ಈ ಕನಿಷ್ಠ ಹೊಂದಾಣಿಕೆಗಳು ಅಧಿಕೃತ ECI ಹುಡುಕಾಟದಿಂದ ಬಂದಿವೆ.",
     newSearch: "ಹೊಸ ಪ್ರಕರಣ",
+    how: {
+      title: "ಯಾರು ಏನು ಮಾಡುತ್ತಾರೆ",
+      roles: [
+        {
+          title: "SIR Assist ಕ್ಲೌಡ್ (Cloudflare Worker)",
+          body: "ಈ ಪುಟ ಮತ್ತು ಎಕ್ಸ್‌ಟೆನ್ಶನ್ ಡೌನ್‌ಲೋಡ್ ಅನ್ನು ಒದಗಿಸುತ್ತದೆ; ಆಯ್ದ ರಾಜ್ಯ ಮತ್ತು ನಮೂದಿಸಿದ ಹೆಸರುಗಳಿಂದ ಮಾತ್ರ ಸೀಮಿತ AI ಕಾಗುಣಿತ ಸಲಹೆಗಳನ್ನು ರಚಿಸುತ್ತದೆ. ಜನ್ಮ ದಿನಾಂಕ, ವಯಸ್ಸು, ಲಿಂಗ, ಜಿಲ್ಲೆ, CAPTCHA ಅಥವಾ ECI ಫಲಿತಾಂಶಗಳನ್ನು ಇದು ಎಂದಿಗೂ ಪಡೆಯುವುದಿಲ್ಲ; ತಾನೇ ECI ಹುಡುಕಾಟ ನಡೆಸುವುದಿಲ್ಲ.",
+        },
+        {
+          title: "ಬ್ರೌಸರ್ ಸಹಾಯಕ (ಎಕ್ಸ್‌ಟೆನ್ಶನ್)",
+          body: "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಅಧಿಕೃತ ECI ಪುಟವನ್ನು ತೆರೆದು, ಅನುಮೋದಿತ ಒಂದು ಸಂಯೋಜನೆಯನ್ನು ಭರ್ತಿ ಮಾಡಿ, CAPTCHA ಚಿತ್ರವನ್ನು ಬದಲಾಯಿಸದೆ ತೋರಿಸಿ, ಒಮ್ಮೆ ಮಾತ್ರ ಸಲ್ಲಿಸಿ, ಕನಿಷ್ಠಗೊಳಿಸಿದ ಸಂಭಾವ್ಯ-ಹೊಂದಾಣಿಕೆ ಸಾರಾಂಶವನ್ನು ಹಿಂತಿರುಗಿಸುತ್ತದೆ. ಹುಡುಕಾಟದ ವಿವರಗಳು ಈ ಪುಟ ಮತ್ತು ECI ಟ್ಯಾಬ್ ನಡುವೆ ಸ್ಥಳೀಯವಾಗಿ ಇರುತ್ತವೆ.",
+        },
+        {
+          title: "ನೀವು",
+          body: "ಪ್ರತಿ CAPTCHA ಅನ್ನು ನೀವೇ ಓದಿ ನಮೂದಿಸುತ್ತೀರಿ, ಪ್ರತಿ ಸಂಯೋಜನೆಯನ್ನು ಮೊದಲೇ ಅನುಮೋದಿಸುತ್ತೀರಿ ಮತ್ತು ಸಂಭಾವ್ಯ ಹೊಂದಾಣಿಕೆಯನ್ನು ಅಧಿಕೃತ ECI ಸೇವೆಯಲ್ಲಿ ಪರಿಶೀಲಿಸುತ್ತೀರಿ.",
+        },
+      ],
+      limitsTitle: "ಬೈಪಾಸ್ ಮಾಡಲಾಗದವು",
+      limits: [
+        "ಪ್ರತಿ ಸಲ್ಲಿಕೆಗೂ ಹೊಸ ಮಾನವ-ನಮೂದಿತ CAPTCHA ಬೇಕು; AI ಅದನ್ನು ಎಂದಿಗೂ ಪರಿಹರಿಸುವುದಿಲ್ಲ.",
+        "ECI ದರ-ಮಿತಿ, ಸೇವಾ ವ್ಯತ್ಯಯ ಮತ್ತು ದತ್ತಾಂಶ ದೋಷಗಳು SIR Assist ನಿಯಂತ್ರಣದ ಹೊರಗಿವೆ.",
+        "ಸಂಭಾವ್ಯ ಹೊಂದಾಣಿಕೆ ಗುರುತಿನ ದೃಢೀಕರಣವಲ್ಲ — ಅಧಿಕೃತ ಸೇವೆಯಲ್ಲಿ ಪರಿಶೀಲಿಸಿ.",
+        "ಶೂನ್ಯ ಫಲಿತಾಂಶವು ಪ್ರಯತ್ನಿಸಿದ ನಿಖರ ಸಂಯೋಜನೆಗಳಿಗೆ ಮಾತ್ರ; ವ್ಯಕ್ತಿ ಪಟ್ಟಿಯಲ್ಲಿ ಇಲ್ಲ ಎಂದು ಸಾಬೀತುಪಡಿಸುವುದಿಲ್ಲ.",
+      ],
+    },
   },
   bn: {
     eyebrow: "বহুভাষিক ভোটার অনুসন্ধান সহায়তা",
@@ -350,8 +407,9 @@ const copy = {
     gender: "লিঙ্গ",
     district: "জেলা",
     optional: "ঐচ্ছিক",
-    continue: "নামের বানান তৈরি করুন",
-    privacy: "তথ্য আপনার SIR Assist ব্রাউজার কম্প্যানিয়ন থেকে সরাসরি সরকারি ECI ট্যাবে যায়; SIR Assist সার্ভারে পাঠানো হয় না।",
+    continue: "AI বানানের পরামর্শ তৈরি করুন",
+    offline: "অফলাইন প্রতিবর্ণীকরণ ব্যবহার করুন",
+    privacy: "বানানের রূপ তৈরি করতে নির্বাচিত রাজ্য ও লেখা নামগুলিই SIR Assist AI-তে পাঠানো হয়। জন্মতারিখ, বয়স, লিঙ্গ, জেলা, CAPTCHA এবং ECI ফলাফল AI-তে পাঠানো হয় না।",
     reviewTitle: "বানানের রূপ যাচাই করুন",
     reviewCopy: "উপযোগী বানানগুলি বাছুন। SIR Assist আঠারোটি পর্যন্ত অনুসন্ধান-সমন্বয় তৈরি করবে; প্রতিটির জন্য নতুন CAPTCHA লাগবে।",
     nameVariants: "ভোটারের নামের রূপ",
@@ -366,6 +424,30 @@ const copy = {
     resultsTitle: "সম্ভাব্য মিল",
     resultsCopy: "এই সীমিত মিলগুলি সরকারি ECI অনুসন্ধান থেকে এসেছে।",
     newSearch: "নতুন কেস",
+    how: {
+      title: "কে কী করে",
+      roles: [
+        {
+          title: "SIR Assist ক্লাউড (Cloudflare Worker)",
+          body: "এই পেজ ও এক্সটেনশন ডাউনলোড পরিবেশন করে এবং শুধু নির্বাচিত রাজ্য ও লেখা নামগুলি থেকে সীমিত AI বানান-পরামর্শ তৈরি করে। জন্মতারিখ, বয়স, লিঙ্গ, জেলা, CAPTCHA বা ECI ফলাফল এটি কখনও পায় না এবং নিজে ECI-তে অনুসন্ধানও করে না।",
+        },
+        {
+          title: "ব্রাউজার সহযোগী (এক্সটেনশন)",
+          body: "আপনার ব্রাউজারে সরকারি ECI পেজ খোলে, অনুমোদিত একটি সমন্বয় পূরণ করে, CAPTCHA ছবি অপরিবর্তিত দেখায়, একবারই জমা দেয় এবং সীমিত সম্ভাব্য-মিল সারাংশ ফেরত দেয়। অনুসন্ধানের তথ্য এই পেজ ও ECI ট্যাবের মধ্যেই স্থানীয়ভাবে থাকে।",
+        },
+        {
+          title: "আপনি",
+          body: "প্রতিটি CAPTCHA নিজে পড়ে লেখেন, প্রতিটি সমন্বয় চালানোর আগে অনুমোদন করেন এবং সম্ভাব্য মিল সরকারি ECI পরিষেবায় যাচাই করেন।",
+        },
+      ],
+      limitsTitle: "যা এড়ানো যায় না",
+      limits: [
+        "প্রতিটি জমা দেওয়া অনুসন্ধানে নতুন মানব-লিখিত CAPTCHA লাগে; AI তা কখনও সমাধান করে না।",
+        "ECI-র রেট-লিমিট, বিভ্রাট ও তথ্যের ভুল SIR Assist-এর নিয়ন্ত্রণের বাইরে।",
+        "সম্ভাব্য মিল পরিচয়ের নিশ্চিতকরণ নয় — সরকারি পরিষেবায় যাচাই করুন।",
+        "শূন্য ফলাফল শুধু চেষ্টা-করা নির্দিষ্ট সমন্বয়গুলিকে বোঝায়; কেউ তালিকায় নেই তা প্রমাণ করে না।",
+      ],
+    },
   },
   or: {
     eyebrow: "ବହୁଭାଷୀ ଭୋଟର ସନ୍ଧାନ ସହାୟତା",
@@ -383,8 +465,9 @@ const copy = {
     gender: "ଲିଙ୍ଗ",
     district: "ଜିଲ୍ଲା",
     optional: "ଇଚ୍ଛାଧୀନ",
-    continue: "ନାମର ରୂପ ପ୍ରସ୍ତୁତ କରନ୍ତୁ",
-    privacy: "ତଥ୍ୟ ଆପଣଙ୍କ SIR Assist ବ୍ରାଉଜର କମ୍ପାନିଅନରୁ ସିଧାସଳଖ ସରକାରୀ ECI ଟ୍ୟାବକୁ ଯାଏ; SIR Assist ସର୍ଭରକୁ ପଠାଯାଏ ନାହିଁ।",
+    continue: "AI ବନାନ ପରାମର୍ଶ ତିଆରି କରନ୍ତୁ",
+    offline: "ଅଫଲାଇନ୍ ଲିପ୍ୟନ୍ତରଣ ବ୍ୟବହାର କରନ୍ତୁ",
+    privacy: "ବନାନ ରୂପ ତିଆରି କରିବାକୁ ବାଛିଥିବା ରାଜ୍ୟ ଓ ଲେଖା ନାମଗୁଡ଼ିକୁ ମାତ୍ର SIR Assist AI କୁ ପଠାଯାଏ। ଜନ୍ମତାରିଖ, ବୟସ, ଲିଙ୍ଗ, ଜିଲ୍ଲା, CAPTCHA ଓ ECI ଫଳାଫଳ AI କୁ ପଠାଯାଏ ନାହିଁ।",
     reviewTitle: "ବନାନ ରୂପ ଯାଞ୍ଚ କରନ୍ତୁ",
     reviewCopy: "ଉପଯୋଗୀ ବନାନଗୁଡ଼ିକ ବାଛନ୍ତୁ। SIR Assist ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ସନ୍ଧାନ ସଂଯୋଜନ ପ୍ରସ୍ତୁତ କରିବ; ପ୍ରତ୍ୟେକ ପାଇଁ ନୂଆ CAPTCHA ଆବଶ୍ୟକ।",
     nameVariants: "ଭୋଟର ନାମ ରୂପ",
@@ -399,6 +482,30 @@ const copy = {
     resultsTitle: "ସମ୍ଭାବ୍ୟ ମେଳ",
     resultsCopy: "ଏହି ସୀମିତ ମେଳଗୁଡ଼ିକ ସରକାରୀ ECI ସନ୍ଧାନରୁ ଆସିଛି।",
     newSearch: "ନୂଆ କେସ",
+    how: {
+      title: "କିଏ କଣ କରେ",
+      roles: [
+        {
+          title: "SIR Assist କ୍ଲାଉଡ୍ (Cloudflare Worker)",
+          body: "ଏହି ପୃଷ୍ଠା ଓ ଏକ୍ସଟେନସନ୍ ଡାଉନଲୋଡ୍ ଯୋଗାଏ ଏବଂ କେବଳ ବଛା ରାଜ୍ୟ ଓ ଲେଖା ନାମରୁ ସୀମିତ AI ବନାନ ପରାମର୍ଶ ତିଆରି କରେ। ଜନ୍ମତାରିଖ, ବୟସ, ଲିଙ୍ଗ, ଜିଲ୍ଲା, CAPTCHA କିମ୍ବା ECI ଫଳାଫଳ ଏହା କେବେ ପାଏ ନାହିଁ; ନିଜେ ECI ସନ୍ଧାନ କରେ ନାହିଁ।",
+        },
+        {
+          title: "ବ୍ରାଉଜର୍ ସହଯୋଗୀ (ଏକ୍ସଟେନସନ୍)",
+          body: "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ ସରକାରୀ ECI ପୃଷ୍ଠା ଖୋଲେ, ଅନୁମୋଦିତ ଗୋଟିଏ ସଂଯୋଜନ ଭରେ, CAPTCHA ଛବି ଅପରିବର୍ତ୍ତିତ ଦେଖାଏ, ଥରେ ମାତ୍ର ଦାଖଲ କରେ ଏବଂ ସୀମିତ ସମ୍ଭାବ୍ୟ-ମେଳ ସାରାଂଶ ଫେରାଏ। ସନ୍ଧାନ ବିବରଣୀ ଏହି ପୃଷ୍ଠା ଓ ECI ଟ୍ୟାବ୍ ମଧ୍ୟରେ ସ୍ଥାନୀୟ ଭାବେ ରହେ।",
+        },
+        {
+          title: "ଆପଣ",
+          body: "ପ୍ରତ୍ୟେକ CAPTCHA ନିଜେ ପଢ଼ି ଲେଖନ୍ତି, ପ୍ରତ୍ୟେକ ସଂଯୋଜନ ଚଳାଇବା ପୂର୍ବରୁ ଅନୁମୋଦନ କରନ୍ତି ଏବଂ ସମ୍ଭାବ୍ୟ ମେଳ ସରକାରୀ ECI ସେବାରେ ଯାଞ୍ଚ କରନ୍ତି।",
+        },
+      ],
+      limitsTitle: "ଯାହା ଏଡ଼ାଯାଇପାରିବ ନାହିଁ",
+      limits: [
+        "ପ୍ରତ୍ୟେକ ଦାଖଲ ପାଇଁ ନୂଆ ମାନବ-ଲିଖିତ CAPTCHA ଆବଶ୍ୟକ; AI ଏହାକୁ କେବେ ସମାଧାନ କରେ ନାହିଁ।",
+        "ECI ର ରେଟ୍-ଲିମିଟ୍, ସେବା ବାଧା ଓ ତଥ୍ୟ ତ୍ରୁଟି SIR Assist ନିୟନ୍ତ୍ରଣ ବାହାରେ।",
+        "ସମ୍ଭାବ୍ୟ ମେଳ ପରିଚୟର ନିଶ୍ଚିତକରଣ ନୁହେଁ — ସରକାରୀ ସେବାରେ ଯାଞ୍ଚ କରନ୍ତୁ।",
+        "ଶୂନ୍ୟ ଫଳାଫଳ କେବଳ ଚେଷ୍ଟା-କରା ନିର୍ଦ୍ଦିଷ୍ଟ ସଂଯୋଜନକୁ ବୁଝାଏ; କେହି ତାଲିକାରେ ନାହାନ୍ତି ବୋଲି ପ୍ରମାଣ କରେ ନାହିଁ।",
+      ],
+    },
   },
 } as const;
 
@@ -413,7 +520,14 @@ const defaultForm: FormData = {
   district: "",
 };
 
-const minimumExtensionVersion = "1.3.0";
+const minimumExtensionVersion = "1.5.0";
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
+
+const officialStateCodes: Record<SupportedState, string> = {
+  karnataka: "S10",
+  west_bengal: "S25",
+  odisha: "S18",
+};
 
 function isExtensionVersionCurrent(version: string): boolean {
   const current = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
@@ -445,12 +559,15 @@ export function SearchAssistant() {
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [candidates, setCandidates] = useState<CandidateSummary[]>([]);
+  const candidatesRef = useRef<CandidateSummary[]>([]);
+  const [resultLimitReached, setResultLimitReached] = useState(false);
   const [searchQueue, setSearchQueue] = useState<SearchAttempt[]>([]);
   const [activeAttemptIndex, setActiveAttemptIndex] = useState(-1);
   const [attemptHistory, setAttemptHistory] = useState<AttemptRecord[]>([]);
-  const [aiVariantOptIn, setAiVariantOptIn] = useState(false);
   const [aiVariantStatus, setAiVariantStatus] =
     useState<AiVariantStatus>("idle");
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [extensionState, setExtensionState] =
@@ -458,6 +575,7 @@ export function SearchAssistant() {
   const [extensionVersion, setExtensionVersion] = useState("");
   const [apiObservation, setApiObservation] =
     useState<OfficialApiObservation | null>(null);
+  const apiObservationRef = useRef<OfficialApiObservation | null>(null);
   const activeCaseRef = useRef("");
   const submittedCaseRef = useRef("");
   const searchQueueRef = useRef<SearchAttempt[]>([]);
@@ -468,13 +586,31 @@ export function SearchAssistant() {
   const t = copy[locale];
   const currentStep = stepIndex(step);
   const stateLabel = stateOptions.find((item) => item.value === form.state)!;
+  const officialRollUrl = `https://voters.eci.gov.in/download-eroll?stateCode=${officialStateCodes[form.state]}`;
   const birthCriteria = useMemo(
     () => birthCriteriaFor(form),
     [form],
   );
+  const selectedRelativeIdentityValues = useMemo(() => {
+    const selected = new Set(selectedRelatives);
+    return relativeVariantGroups.flatMap((group) => {
+      const preferred = group.candidates.find((candidate) =>
+        selected.has(candidate.value),
+      );
+      return preferred ? [preferred.value] : [];
+    });
+  }, [relativeVariantGroups, selectedRelatives]);
   const plannedAttempts = useMemo(
-    () => planSearchQueue(selectedNames, selectedRelatives, birthCriteria, 18),
-    [birthCriteria, selectedNames, selectedRelatives],
+    () =>
+      planSearchQueue(selectedNames, selectedRelatives, birthCriteria, 18, {
+        relativeIdentityValues: selectedRelativeIdentityValues,
+      }),
+    [
+      birthCriteria,
+      selectedNames,
+      selectedRelativeIdentityValues,
+      selectedRelatives,
+    ],
   );
   const selectedCombinationCount =
     selectedNames.length * selectedRelatives.length * birthCriteria.length;
@@ -504,6 +640,12 @@ export function SearchAssistant() {
   ).length;
   const nextAttemptIndex = activeAttemptIndex + 1;
   const nextAttempt = searchQueue[nextAttemptIndex];
+  const showOfficialFallback = shouldOfferOfficialFallback({
+    candidateCount: candidates.length,
+    attemptedCount: attemptHistory.length,
+    completedAttemptCount,
+    plannedAttemptCount: searchQueue.length,
+  });
   const apiCallAccepted = Boolean(
     apiObservation &&
       apiObservation.status >= 200 &&
@@ -543,6 +685,7 @@ export function SearchAssistant() {
         ) {
           return;
         }
+        apiObservationRef.current = message.observation;
         setApiObservation(message.observation);
         return;
       }
@@ -576,8 +719,15 @@ export function SearchAssistant() {
             `search ${attemptIndex + 1}`,
           ],
         }));
-        setCandidates((current) =>
-          deduplicateCandidates([current, annotated], 10) as CandidateSummary[],
+        const mergedCandidates = deduplicateCandidates(
+          [candidatesRef.current, annotated],
+          10,
+        ) as CandidateSummary[];
+        candidatesRef.current = mergedCandidates;
+        setCandidates(mergedCandidates);
+        setResultLimitReached(
+          (current) =>
+            current || message.resultLimitReached || mergedCandidates.length >= 10,
         );
         if (attempt) {
           setAttemptHistory((current) => [
@@ -586,6 +736,7 @@ export function SearchAssistant() {
               attempt,
               status: "completed",
               candidateCount: message.candidates.length,
+              apiStatus: apiObservationRef.current?.status,
             },
           ]);
         }
@@ -598,6 +749,10 @@ export function SearchAssistant() {
       }
       if (message.type === "ERROR") {
         clearStartTimeout();
+        if (apiObservationRef.current?.status === 429) {
+          setCooldownUntil(Date.now() + RATE_LIMIT_COOLDOWN_MS);
+          setCooldownRemaining(Math.ceil(RATE_LIMIT_COOLDOWN_MS / 1000));
+        }
         const attemptIndex = activeAttemptIndexRef.current;
         const attempt = searchQueueRef.current[attemptIndex];
         if (attempt) {
@@ -607,6 +762,7 @@ export function SearchAssistant() {
               attempt,
               status: "failed",
               candidateCount: 0,
+              apiStatus: apiObservationRef.current?.status,
               message: message.error,
             },
           ]);
@@ -635,6 +791,19 @@ export function SearchAssistant() {
     if (step !== "results") return;
     window.requestAnimationFrame(() => resultsHeadingRef.current?.focus());
   }, [step]);
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const interval = window.setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((cooldownUntil - Date.now()) / 1000),
+      );
+      setCooldownRemaining(remaining);
+      if (remaining === 0) setCooldownUntil(0);
+    }, 1_000);
+    return () => window.clearInterval(interval);
+  }, [cooldownUntil]);
 
   useEffect(() => {
     if (step !== "captcha" || !expiresAt || !caseId) return;
@@ -693,8 +862,14 @@ export function SearchAssistant() {
 
   async function prepareVariants(event: FormEvent) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | null;
+    const requestAi = submitter?.value !== "offline";
     if (parseAgeAlternatives(form.age) === null) {
-      setError("Enter ages as whole numbers separated by commas, semicolons or slashes.");
+      setError(
+        `Enter up to ${MAX_AGE_ALTERNATIVES} exact ages, or one ascending range covering no more than ${MAX_AGE_ALTERNATIVES} ages (for example, 40-46).`,
+      );
       return;
     }
     if (form.dob && !isAdultDob(form.dob)) {
@@ -713,13 +888,16 @@ export function SearchAssistant() {
       relativeNames,
       form.state,
     );
-    setAiVariantStatus(aiVariantOptIn ? "loading" : "idle");
-    if (aiVariantOptIn) {
+    setAiVariantStatus(requestAi ? "loading" : "offline");
+    if (requestAi) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12_000);
       setBusy(true);
       try {
         const response = await fetch("/api/variants", {
           method: "POST",
           headers: { "content-type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             state: form.state,
             voterName: form.name,
@@ -755,6 +933,7 @@ export function SearchAssistant() {
       } catch {
         setAiVariantStatus("fallback");
       } finally {
+        window.clearTimeout(timeout);
         setBusy(false);
       }
     }
@@ -768,7 +947,10 @@ export function SearchAssistant() {
     activeAttemptIndexRef.current = -1;
     setAttemptHistory([]);
     setCandidates([]);
+    candidatesRef.current = [];
+    setResultLimitReached(false);
     setApiObservation(null);
+    apiObservationRef.current = null;
     submittedCaseRef.current = "";
     setError("");
     setStep("variants");
@@ -792,12 +974,19 @@ export function SearchAssistant() {
       );
       return;
     }
+    if (Date.now() < cooldownUntil) {
+      setError(
+        `The official service rate-limited the previous attempt (HTTP 429). Wait ${Math.max(1, cooldownRemaining)}s before the next search.`,
+      );
+      return;
+    }
     setActiveAttemptIndex(attemptIndex);
     activeAttemptIndexRef.current = attemptIndex;
     const requestId = crypto.randomUUID();
     activeCaseRef.current = requestId;
     submittedCaseRef.current = "";
     setApiObservation(null);
+    apiObservationRef.current = null;
     setCaseId(requestId);
     setBusy(true);
     setError("");
@@ -829,6 +1018,8 @@ export function SearchAssistant() {
     searchQueueRef.current = plannedAttempts;
     setAttemptHistory([]);
     setCandidates([]);
+    candidatesRef.current = [];
+    setResultLimitReached(false);
     startAttempt(plannedAttempts[0], 0);
   }
 
@@ -838,6 +1029,14 @@ export function SearchAssistant() {
     if (!attempt) return;
     setError("");
     startAttempt(attempt, nextIndex);
+  }
+
+  function refreshCaptcha() {
+    if (!caseId || busy) return;
+    setBusy(true);
+    setError("");
+    setCaptchaAnswer("");
+    sendExtensionMessage({ type: "REFRESH_CAPTCHA", requestId: caseId });
   }
 
   function submitSearch(event: FormEvent) {
@@ -866,6 +1065,7 @@ export function SearchAssistant() {
     setCaptchaAnswer("");
     setExpiresAt("");
     setApiObservation(null);
+    apiObservationRef.current = null;
     setError("");
     setStep(nextStep);
     if (activeCaseId) {
@@ -878,6 +1078,8 @@ export function SearchAssistant() {
       activeAttemptIndexRef.current = -1;
       setAttemptHistory([]);
       setCandidates([]);
+      candidatesRef.current = [];
+      setResultLimitReached(false);
     }
   }
 
@@ -893,13 +1095,15 @@ export function SearchAssistant() {
     setCaptchaAnswer("");
     setExpiresAt("");
     setCandidates([]);
+    candidatesRef.current = [];
+    setResultLimitReached(false);
     setSearchQueue([]);
     searchQueueRef.current = [];
     setActiveAttemptIndex(-1);
     activeAttemptIndexRef.current = -1;
     setAttemptHistory([]);
     setApiObservation(null);
-    setAiVariantOptIn(false);
+    apiObservationRef.current = null;
     setAiVariantStatus("idle");
     setError("");
     activeCaseRef.current = "";
@@ -1055,7 +1259,7 @@ export function SearchAssistant() {
                     maxLength={10}
                   />
                   <small className="field-help">
-                    Use YYYY-MM-DD. When ages are also entered, the exact-age searches run first. Latest adult DOB: {adultDobMaxValue()}.
+                    Use YYYY-MM-DD. An entered DOB is searched first, before any age alternatives. If you trust the exact DOB, leave ages blank—each age adds one more CAPTCHA search. Latest adult DOB: {adultDobMaxValue()}.
                   </small>
                 </div>
                 <div className="field">
@@ -1068,13 +1272,13 @@ export function SearchAssistant() {
                     value={form.age}
                     onChange={(event) => update("age", event.target.value)}
                     type="text"
-                    inputMode="numeric"
-                    placeholder="42, 43"
+                    inputMode="text"
+                    placeholder="42, 43 or 40-46"
                     aria-label="Age alternatives"
-                    maxLength={24}
+                    maxLength={48}
                   />
                   <small className="field-help">
-                    Enter up to four exact age alternatives, separated by commas. Each age is searched separately; this is not an age bracket.
+                    Enter up to {MAX_AGE_ALTERNATIVES} exact ages, or one short inclusive range such as 40-46, only when the DOB is uncertain. Every age becomes a separate exact-age search; this is not an age bracket.
                   </small>
                 </div>
                 <div className="field">
@@ -1102,31 +1306,30 @@ export function SearchAssistant() {
 
               {error && <p className="error-message" role="alert">{error}</p>}
 
-              <div className="actions">
-                <span />
-                <button className="primary-button" type="submit" disabled={busy}>
+              <p className="privacy-note ai-generation-disclosure">
+                {t.privacy}
+              </p>
+              <div className="actions generation-actions">
+                <button
+                  className="primary-button"
+                  type="submit"
+                  name="variantMode"
+                  value="ai"
+                  disabled={busy}
+                >
                   {busy && <span className="spinner" aria-hidden="true" />}
                   {t.continue}<span className="button-arrow" aria-hidden="true">→</span>
                 </button>
+                <button
+                  className="secondary-button"
+                  type="submit"
+                  name="variantMode"
+                  value="offline"
+                  disabled={busy}
+                >
+                  {t.offline}
+                </button>
               </div>
-              <label className="ai-variant-option">
-                <input
-                  type="checkbox"
-                  checked={aiVariantOptIn}
-                  onChange={(event) => setAiVariantOptIn(event.target.checked)}
-                />
-                <span>
-                  <strong>Use AI for better name spellings</strong>
-                  <small>
-                    Send the entered names to AI for better spelling suggestions.
-                  </small>
-                </span>
-              </label>
-              <p className="privacy-note">
-                {aiVariantOptIn
-                  ? "AI spelling suggestions are on."
-                  : t.privacy}
-              </p>
             </form>
           )}
 
@@ -1138,13 +1341,15 @@ export function SearchAssistant() {
               <p className="selection-note">
                 Generated spellings are suggestions only. The names you entered are selected by default; only spellings you check are added to the search queue.
               </p>
-              {aiVariantOptIn && (
+              {aiVariantStatus !== "idle" && (
                 <p className={`ai-variant-status ${aiVariantStatus}`} role="status">
                   {aiVariantStatus === "generated"
                     ? "AI spelling suggestions added."
                     : aiVariantStatus === "loading"
                       ? "Generating AI spelling suggestions…"
-                      : "AI was unavailable, so local spelling suggestions are shown."}
+                      : aiVariantStatus === "offline"
+                        ? "Offline generic transliteration selected. Review these approximations before searching."
+                        : "AI was unavailable or rejected invalid output, so generic offline transliterations are shown."}
                 </p>
               )}
               <VariantGroup
@@ -1193,7 +1398,7 @@ export function SearchAssistant() {
                   <p>Select at least one spelling in each list.</p>
                 )}
                 <p className="search-plan-note">
-                  Only checked spellings are queued. Exact ages are tried before DOB when both are entered. Each row is a separate official search and requires a new human-entered CAPTCHA.
+                  Only checked spellings are queued. Every selected relative identity gets the first birth-detail search before any full sweep. The primary relative&apos;s remaining age/DOB criteria run first, followed by the other identities and then spelling variants. A short age range expands into separate exact-age searches, which run after an entered DOB. Each row requires a fresh human-entered CAPTCHA, and the queue never exceeds 18 searches.
                 </p>
                 {cappedCombinationCount > 0 && (
                   <p className="search-plan-cap" role="status">
@@ -1302,6 +1507,15 @@ export function SearchAssistant() {
               {error && <p className="error-message" role="alert">{error}</p>}
               <div className="actions">
                 <button className="text-button" type="button" onClick={() => cancelSearch("variants")}>← Cancel case</button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={refreshCaptcha}
+                  disabled={busy || !caseId}
+                  data-testid="refresh-captcha"
+                >
+                  Show a new CAPTCHA
+                </button>
                 <button className="primary-button" type="submit" disabled={busy || !caseId || captchaAnswer.trim().length < 4} data-testid="submit-search">
                   {busy && <span className="spinner" aria-hidden="true" />}
                   {t.submit}<span className="button-arrow" aria-hidden="true">→</span>
@@ -1407,6 +1621,19 @@ export function SearchAssistant() {
                       : "A completed zero-result search only describes the exact spelling, relative and birth criterion shown in that attempt. Try another planned combination if available."}
                 </p>
               </section>
+              {candidates.length > 0 && (
+                <section className="verify-first" aria-labelledby="verify-first-heading">
+                  <div>
+                    <h3 id="verify-first-heading">Found the right person? Stop here and verify officially.</h3>
+                    <p>
+                      Each further search costs another human-entered CAPTCHA and adds load on the official service. Confirm the match on the official ECI page first; continue the remaining planned searches only if none of these results is the right person.
+                    </p>
+                  </div>
+                  <a href="https://electoralsearch.eci.gov.in/" target="_blank" rel="noreferrer">
+                    Verify on official ECI search
+                  </a>
+                </section>
+              )}
               <div className="search-outcome-totals" aria-label="Search outcome totals">
                 <span><strong>{completedAttemptCount}</strong> completed</span>
                 <span><strong>{completedZeroCount}</strong> completed with zero returned</span>
@@ -1415,7 +1642,7 @@ export function SearchAssistant() {
               <section className="result-stack" aria-label="Possible match details">
                 {lastAttemptRecord?.status === "completed" && candidates.length === 0 && (
                   <p className="empty-result">
-                    Official search {activeAttemptIndex + 1} completed and returned zero possible matches for this exact combination.
+                    The ECI page showed no possible matches after an observed HTTP 2xx response for official search {activeAttemptIndex + 1} and this exact combination.
                   </p>
                 )}
                 {candidates.map((candidate, index) => (
@@ -1439,6 +1666,34 @@ export function SearchAssistant() {
               <div className="minimized-callout">
                 Privacy guardrail: a displayed age band is privacy-minimized result information, not the bracket searched. Each entered age was searched as an exact alternative. EPIC number, address, polling station and full voter details are intentionally omitted.
               </div>
+              {resultLimitReached && (
+                <p className="result-limit-warning" role="status">
+                  SIR Assist reached its 10-summary privacy limit. Additional official rows may not be displayed; narrow the district or verify directly on ECI before excluding a possible match.
+                </p>
+              )}
+              {showOfficialFallback && (
+                <section className="official-fallbacks" aria-labelledby="official-fallbacks-heading">
+                  <div>
+                    <h3 id="official-fallbacks-heading">Still not found?</h3>
+                    <p>
+                      Try an EPIC-number search or inspect the published electoral roll directly on an official ECI site. SIR Assist does not receive anything you enter on those pages.
+                    </p>
+                  </div>
+                  <div className="official-fallback-links">
+                    <a href="https://electoralsearch.eci.gov.in/" target="_blank" rel="noreferrer">
+                      Open official ECI search
+                    </a>
+                    <a href={officialRollUrl} target="_blank" rel="noreferrer">
+                      Download official electoral roll
+                    </a>
+                    {form.state === "west_bengal" && (
+                      <a href="https://ceowestbengal.wb.gov.in/SIR" target="_blank" rel="noreferrer">
+                        West Bengal SIR 2026 rolls and lists
+                      </a>
+                    )}
+                  </div>
+                </section>
+              )}
               <details className="attempt-progress">
                 <summary>
                   Search attempts · {attemptHistory.length} of {searchQueue.length} attempted
@@ -1452,7 +1707,7 @@ export function SearchAssistant() {
                       <div>
                         <strong>{record.attempt.name}</strong>
                         <small>
-                          {record.attempt.relativeName} · {formatBirthCriterion(record.attempt.birth)} · {record.status === "completed" ? `completed · ${record.candidateCount} returned` : "failed · no official result"}
+                          {record.attempt.relativeName} · {formatBirthCriterion(record.attempt.birth)} · {record.status === "completed" ? `completed · ${record.candidateCount} returned` : "failed · no official result"}{typeof record.apiStatus === "number" ? ` · ${record.apiStatus === 0 ? "no HTTP status" : `HTTP ${record.apiStatus}`}` : ""}
                         </small>
                         {record.status === "failed" && record.message && (
                           <small className="attempt-message">{record.message}</small>
@@ -1462,12 +1717,26 @@ export function SearchAssistant() {
                   ))}
                 </ol>
               </details>
+              {cooldownRemaining > 0 && (
+                <p className="cooldown-note" role="status">
+                  The official service rate-limited the last attempt (HTTP 429). To avoid further throttling, the next search unlocks in {cooldownRemaining}s.
+                </p>
+              )}
               <div className="actions">
                 <button className="secondary-button" type="button" onClick={reset}>{t.newSearch}</button>
                 {nextAttempt && (
-                  <button className="primary-button next-search-button" type="button" onClick={startNextAttempt} disabled={busy}>
+                  <button
+                    className={`${candidates.length > 0 ? "secondary-button" : "primary-button"} next-search-button`}
+                    type="button"
+                    onClick={startNextAttempt}
+                    disabled={busy || cooldownRemaining > 0}
+                  >
                     <span>
-                      <strong>Try {formatBirthCriterion(nextAttempt.birth)} next</strong>
+                      <strong>
+                        {candidates.length > 0
+                          ? `Continue anyway: ${formatBirthCriterion(nextAttempt.birth)}`
+                          : `Try ${formatBirthCriterion(nextAttempt.birth)} next`}
+                      </strong>
                       <small>{nextAttempt.name} · relative {nextAttempt.relativeName}</small>
                     </span>
                     <span className="button-arrow" aria-hidden="true">→</span>
@@ -1477,6 +1746,26 @@ export function SearchAssistant() {
             </div>
           )}
         </section>
+      </section>
+
+      <section className="role-map" aria-labelledby="role-map-title">
+        <h2 id="role-map-title">{t.how.title}</h2>
+        <div className="role-grid">
+          {t.how.roles.map((role) => (
+            <article className="role-card" key={role.title}>
+              <h3>{role.title}</h3>
+              <p>{role.body}</p>
+            </article>
+          ))}
+        </div>
+        <div className="role-limits">
+          <h3>{t.how.limitsTitle}</h3>
+          <ul>
+            {t.how.limits.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <footer className="footer-note">

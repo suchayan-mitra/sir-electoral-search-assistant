@@ -17,6 +17,8 @@ Security fixes are applied to the latest version on the default branch. Public f
 - No cookie, debugger, browsing-history, `webRequest`, proxy, or all-sites permission is allowed.
 - The local observer may run only for the human-authorized submission, must match the exact official search endpoint and encrypted request envelope, and may relay only method, status, and envelope key names. It must not read the response body.
 - Official results remain minimized; sensitive voter fields are neither returned nor stored.
-- Optional AI receives names and state only and never controls the official page.
+- The primary AI spelling action sends names and state only; the offline action sends neither. AI never controls the official page.
+- AI output is schema-, script-, and identity-structure-validated before display; rejected output falls back without exposing provider errors.
+- Variant source must not embed person-specific name mappings; generic fallback rules must operate uniformly on unseen names.
 
 Changes that weaken an invariant should not be merged.

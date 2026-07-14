@@ -73,8 +73,8 @@ async function cleanup(requestId, closeOfficial = true) {
 }
 
 function minimizeCandidates(value) {
-  if (!Array.isArray(value)) return null;
-  return value.slice(0, 10).map((row, index) => ({
+  if (!Array.isArray(value) || value.length > 10) return null;
+  return value.map((row, index) => ({
     id: `candidate-${String(index + 1).padStart(2, "0")}`,
     displayName: protocol.cleanText(row?.displayName, `Candidate ${index + 1}`),
     match: "possible",
@@ -183,6 +183,31 @@ async function handleAppMessage(message, sender) {
     return undefined;
   }
 
+  if (message.type === "REFRESH_CAPTCHA") {
+    if (session.phase !== "captcha") {
+      return pageMessage({
+        type: "ERROR",
+        requestId: message.requestId,
+        error: "A new CAPTCHA can only be requested while one is pending.",
+      });
+    }
+    try {
+      await chrome.tabs.sendMessage(session.officialTabId, {
+        source: "sir-assist-extension",
+        type: "REFRESH_CAPTCHA",
+        requestId: message.requestId,
+      });
+    } catch {
+      await cleanup(message.requestId);
+      return pageMessage({
+        type: "ERROR",
+        requestId: message.requestId,
+        error: "The official ECI tab was unavailable. Start a new case.",
+      });
+    }
+    return undefined;
+  }
+
   if (message.type === "CANCEL") {
     await cleanup(message.requestId);
     return undefined;
@@ -218,7 +243,10 @@ async function handleEciMessage(message, sender) {
     });
     return undefined;
   }
-  if (message.type === "CAPTCHA_READY" && session.phase === "opening") {
+  if (
+    message.type === "CAPTCHA_READY" &&
+    (session.phase === "opening" || session.phase === "captcha")
+  ) {
     if (
       !protocol.isCaptchaDataImage(message.captchaImage)
     ) {
@@ -244,14 +272,19 @@ async function handleEciMessage(message, sender) {
 
   if (message.type === "RESULTS" && session.phase === "submitting") {
     const candidates = minimizeCandidates(message.candidates);
-    if (!candidates) {
+    if (!candidates || typeof message.resultLimitReached !== "boolean") {
       await sendToApp(session, {
         type: "ERROR",
         requestId,
         error: "The official results could not be safely minimized.",
       });
     } else {
-      await sendToApp(session, { type: "RESULTS", requestId, candidates });
+      await sendToApp(session, {
+        type: "RESULTS",
+        requestId,
+        candidates,
+        resultLimitReached: message.resultLimitReached,
+      });
     }
     await cleanup(requestId);
     return undefined;

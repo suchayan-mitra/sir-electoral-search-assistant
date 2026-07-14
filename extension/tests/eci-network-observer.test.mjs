@@ -191,7 +191,7 @@ test("XHR observer reports status without reading raw response values", () => {
     422,
     JSON.stringify({
       error: { code: "PRIVATE-CODE", message: "PRIVATE-MESSAGE" },
-      SuchayanMitra: "PRIVATE-DYNAMIC-KEY-VALUE",
+      PrivateDynamicField: "PRIVATE-DYNAMIC-KEY-VALUE",
     }),
   );
 
@@ -206,7 +206,7 @@ test("XHR observer reports status without reading raw response values", () => {
   });
   assert.doesNotMatch(
     JSON.stringify(events[0]),
-    /PRIVATE-CODE|PRIVATE-MESSAGE|SuchayanMitra|PRIVATE-DYNAMIC-KEY-VALUE/,
+    /PRIVATE-CODE|PRIVATE-MESSAGE|PrivateDynamicField|PRIVATE-DYNAMIC-KEY-VALUE/,
   );
 });
 
@@ -221,7 +221,7 @@ test("XHR observer never reads or reports root-array response bodies", () => {
     JSON.stringify([
       {
         content: { items: [] },
-        SuchayanMitra: "PRIVATE-ROW-VALUE",
+        PrivateDynamicField: "PRIVATE-ROW-VALUE",
       },
     ]),
   );
@@ -232,7 +232,10 @@ test("XHR observer never reads or reports root-array response bodies", () => {
     schemaKeys: [],
     arrayLengths: [],
   });
-  assert.doesNotMatch(JSON.stringify(observation), /SuchayanMitra|PRIVATE-ROW-VALUE/);
+  assert.doesNotMatch(
+    JSON.stringify(observation),
+    /PrivateDynamicField|PRIVATE-ROW-VALUE/,
+  );
 });
 
 test("observer ignores query-bearing, non-POST and non-envelope requests", async () => {
@@ -313,7 +316,7 @@ test("protocol accepts only the bounded encrypted search observation", () => {
       ...valid,
       response: {
         ...valid.response,
-        schemaKeys: ["SuchayanMitra.privateIdentifier"],
+        schemaKeys: ["PrivateDynamicField.privateIdentifier"],
       },
     }),
     false,

@@ -11,7 +11,7 @@ The official ECI search runs on ECI's webpage and requires a fresh CAPTCHA enter
 3. show the untouched ECI CAPTCHA back in SIR Assist for the user to type; and
 4. return only a minimized possible-match summary.
 
-Cloudflare Workers AI is optional and can suggest name spellings in the web app. It never operates this extension, sees official-search details or results, or interprets a CAPTCHA.
+AI-first spelling generation occurs in the web app after the user chooses its clearly labelled action; a dictionary-free offline alternative is also available. AI never operates this extension, sees official-search details or results, or interprets a CAPTCHA.
 
 ## Install the development build
 
@@ -40,13 +40,15 @@ Requested Chrome permissions:
 1. SIR Assist displays a user-approved queue capped at eighteen name/relative/birth-detail combinations.
 2. For each attempt, SIR Assist sends one voter-name spelling, one relative-name spelling and exactly one DOB or age criterion to the extension.
 3. The extension opens a background ECI tab, fills the official Search by Details form, and verifies that ECI retained the selected fields.
-4. Only after that verification, the official CAPTCHA image is relayed to SIR Assist without interpretation.
+4. Only after that verification, the official CAPTCHA image is relayed to SIR Assist without interpretation. If the image is unreadable, SIR Assist can ask the companion to click ECI's own CAPTCHA-refresh control and relay the fresh image; the companion never requests a challenge from the gateway itself.
 5. The user types the answer in SIR Assist; the extension submits it once to the same ECI tab.
 6. The extension returns minimized candidates, closes the ECI tab, and SIR Assist offers the next approved attempt with a fresh CAPTCHA.
 
 After the human authorizes step 5, a document-start script in ECI's page context observes the one official encrypted search request. It uses the page's existing `fetch` and `XMLHttpRequest` calls; it does not replay, alter, decrypt, or proxy them. The observer is dormant before submission, accepts only the exact `POST` to `https://gateway-voters.eci.gov.in/api/v1/elastic/search-by-details-from-state-display-v1`, and disarms after its first matching response.
 
 Only bounded, value-free diagnostics cross the extension bridge: transport, method, exact origin and path, query-key names, HTTP status, and encrypted-envelope key names. Response metadata arrays are required to remain empty; the observer never reads a response body. Headers, sizes, query values, names, relatives, DOB or age values, CAPTCHA data or answers, request bodies, and response bodies never cross the observer event. Diagnostics remain transient and are discarded with the active attempt.
+
+Version 1.5 adds the official CAPTCHA-refresh relay described above and keeps the one-submission-per-case rule unchanged. Version 1.4 classifies status 0, HTTP 429, other 4xx and 5xx failures separately. A 2xx response is not enough to record an empty search: the official page must expose a fresh `No Result Found` marker that stays structurally stable across repeated checks. A result table must likewise be fresh, stable and contain at least one row. When the ten-summary privacy limit is reached, the extension sends only a boolean limit flag—never a raw row count—so the app can warn the user to narrow the official search.
 
 Transient case state uses `chrome.storage.session` for up to three minutes and is removed on completion, failure, cancellation, timeout, or tab closure. CAPTCHA answers are forwarded directly and are never stored.
 

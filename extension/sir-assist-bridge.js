@@ -13,7 +13,13 @@
     return;
   }
 
-  const pageTypes = new Set(["PING", "START", "SUBMIT", "CANCEL"]);
+  const pageTypes = new Set([
+    "PING",
+    "START",
+    "SUBMIT",
+    "REFRESH_CAPTCHA",
+    "CANCEL",
+  ]);
   const extensionTypes = new Set([
     "READY",
     "STARTED",

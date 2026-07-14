@@ -94,7 +94,7 @@ async function handleVariantSuggestions(
     return apiJson(
       {
         error:
-          "Provide only state, voter name, relative names, and explicit AI opt-in.",
+          "Provide only state, voter name, relative names, and the explicit AI-request flag.",
       },
       400,
     );

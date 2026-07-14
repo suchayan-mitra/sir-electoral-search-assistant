@@ -43,5 +43,7 @@ test("public release documents privacy, security and contribution boundaries", a
   assert.match(privacy, /CAPTCHA answers.*never stored/);
   assert.match(privacy, /EPIC number, address, polling station/);
   assert.match(security, /One CAPTCHA permits at most one official submission/);
+  assert.match(security, /must not embed person-specific name mappings/);
   assert.match(contributing, /Do not add CAPTCHA solving, OCR, evasion/);
+  assert.match(contributing, /Do not add person-specific name dictionaries/);
 });

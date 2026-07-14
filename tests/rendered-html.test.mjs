@@ -33,10 +33,26 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Planned search queue/);
   assert.match(assistant, /18 hard maximum/);
   assert.match(assistant, /18-search cap applied/);
-  assert.match(assistant, /Send the entered names to AI for better spelling suggestions/);
+  assert.match(assistant, /Generate AI spelling variants/);
+  assert.match(assistant, /Use offline transliteration/);
+  assert.match(assistant, /This sends only the selected state and entered names to SIR Assist AI/);
+  assert.match(assistant, /const requestAi = submitter\?\.value !== "offline"/);
+  assert.match(assistant, /signal: controller\.signal/);
+  assert.doesNotMatch(assistant, /aiVariantOptIn|setAiVariantOptIn/);
   assert.match(assistant, /Age alternatives/);
-  assert.match(assistant, /Each age is searched separately; this is not an age bracket/);
-  assert.match(assistant, /Exact ages are tried before DOB/);
+  assert.match(assistant, /one short inclusive range such as 40-46/);
+  assert.match(assistant, /Every age becomes a separate exact-age search; this is not an age bracket/);
+  assert.match(assistant, /queue never exceeds 18 searches/);
+  assert.match(assistant, /Every selected relative identity gets the first birth-detail search/);
+  assert.match(assistant, /primary relative&apos;s remaining age\/DOB criteria run first/i);
+  assert.match(assistant, /relativeIdentityValues: selectedRelativeIdentityValues/);
+  assert.match(assistant, /short age range expands into separate exact-age searches, which run after an entered DOB/);
+  assert.match(assistant, /An entered DOB is searched first, before any age alternatives/);
+  assert.match(assistant, /Who does what/);
+  assert.match(assistant, /What cannot be bypassed/);
+  assert.match(assistant, /it never searches ECI itself/);
+  assert.match(assistant, /Stop here and verify officially/);
+  assert.match(assistant, /Verify on official ECI search/);
   assert.match(assistant, /Other relative-name alternatives/);
   assert.match(assistant, /Generated spellings are suggestions only/);
   assert.match(assistant, /only spellings you check are added to the search queue/);
@@ -47,10 +63,16 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /setSelectedNames\(uniqueValues\(\[form\.name\.trim\(\)\], 1\)\)/);
   assert.match(assistant, /setSelectedRelatives\(relativeNames\)/);
   assert.match(assistant, /Relative identity · suggestions stay in this group/);
-  assert.match(assistant, /Try \{formatBirthCriterion\(nextAttempt\.birth\)\} next/);
+  assert.match(assistant, /Try \$\{formatBirthCriterion\(nextAttempt\.birth\)\} next/);
+  assert.match(assistant, /Continue anyway: \$\{formatBirthCriterion\(nextAttempt\.birth\)\}/);
   assert.match(assistant, /nextAttempt\.name\} · relative \{nextAttempt\.relativeName/);
   assert.match(assistant, /sir-assist-browser-companion\.zip/);
-  assert.match(assistant, /minimumExtensionVersion = "1\.3\.0"/);
+  assert.match(assistant, /minimumExtensionVersion = "1\.5\.0"/);
+  assert.match(assistant, /Show a new CAPTCHA/);
+  assert.match(assistant, /type: "REFRESH_CAPTCHA", requestId: caseId/);
+  assert.match(assistant, /RATE_LIMIT_COOLDOWN_MS = 60_000/);
+  assert.match(assistant, /rate-limited the last attempt \(HTTP 429\)/);
+  assert.match(assistant, /disabled=\{busy \|\| cooldownRemaining > 0\}/);
   assert.match(assistant, /Browser companion update required/);
   assert.match(assistant, /!extensionReady/);
   assert.match(assistant, /available for up to three minutes/);
@@ -60,12 +82,21 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /No official result was recorded/);
   assert.match(assistant, /failed or expired attempt—not a zero-match response/);
   assert.match(assistant, /Official API call observed/);
+  assert.match(assistant, /apiStatus: apiObservationRef\.current\?\.status/);
+  assert.match(assistant, /after an observed HTTP 2xx response/);
   assert.match(assistant, /human-entered CAPTCHA submission/);
   assert.match(assistant, /encrypted wire envelope/);
   assert.match(assistant, /No voter input, CAPTCHA or response body enters this diagnostic/);
   assert.match(assistant, /metadata is not logged, sent to SIR Assist servers or stored/);
   assert.match(assistant, /ECI did not return a successful 2xx status/);
   assert.match(assistant, /not a completed zero-result search/);
+  assert.match(assistant, /10-summary privacy limit/);
+  assert.match(assistant, /Open official ECI search/);
+  assert.match(assistant, /Download official electoral roll/);
+  assert.match(assistant, /West Bengal SIR 2026 rolls and lists/);
+  assert.match(assistant, /\{showOfficialFallback && \(/);
+  assert.match(assistant, /shouldOfferOfficialFallback/);
+  assert.match(assistant, /message\.resultLimitReached/);
   assert.match(assistant, /message\.type === "API_OBSERVATION"/);
   assert.match(assistant, /message\.requestId !== submittedCaseRef\.current/);
   assert.match(assistant, /step === "results"/);
@@ -88,14 +119,16 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(worker, /extensionRequired: true/);
   assert.doesNotMatch(assistant, /codex-preview|react-loading-skeleton|ChatGPT|mock search/i);
 
+  // A trusted DOB must consume the first CAPTCHA-backed attempt; guessed ages
+  // only run after it.
   const ageCriterionPosition = assistant.indexOf(
     'criteria.push({ kind: "age", value: age })',
   );
   const dobCriterionPosition = assistant.indexOf(
     'criteria.push({ kind: "dob", value: form.dob })',
   );
-  assert.ok(ageCriterionPosition >= 0);
-  assert.ok(dobCriterionPosition > ageCriterionPosition);
+  assert.ok(dobCriterionPosition >= 0);
+  assert.ok(ageCriterionPosition > dobCriterionPosition);
 });
 
 test("extension protocol accepts one selected bounded search", () => {
@@ -196,13 +229,14 @@ test("preserves native-script input without inventing variants", () => {
   assert.deepEqual(generateVariants("   ", "odisha"), []);
 });
 
-test("uses conservative Bengali lexical corrections for known name words", () => {
-  const suchayan = generateVariants("Suchayan Mitra", "west_bengal");
-  const chandramouli = generateVariants("Chandramauli Mitra", "west_bengal");
-  const sudiptaGhose = generateVariants("Sudipta Ghose", "west_bengal");
-  assert.ok(suchayan.includes("সুচয়ন মিত্র"));
-  assert.ok(chandramouli.includes("চন্দ্রমৌলি মিত্র"));
-  assert.ok(sudiptaGhose.includes("সুদীপ্ত ঘোষ"));
-  assert.equal(suchayan.some((value) => value.includes("সুচযন")), false);
-  assert.equal(sudiptaGhose.some((value) => value.includes("ঘোসে")), false);
+test("generic fallback contains no person-specific name dictionary", async () => {
+  const variantsSource = await source("../lib/variants.mjs");
+  assert.doesNotMatch(
+    variantsSource,
+    /wordOverrides|phraseOverrides|nameOverrides|curatedStateScriptVariants/,
+  );
+  assert.doesNotMatch(
+    variantsSource,
+    /\b[a-z]{3,}\s*:\s*\[[^\]]*[\u0980-\u09ff\u0b00-\u0b7f\u0c80-\u0cff]/i,
+  );
 });

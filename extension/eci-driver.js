@@ -25,10 +25,12 @@
   };
   let activeRequestId = "";
   let phase = "idle";
+  let captchaRefreshInFlight = false;
   let observerToken = "";
   let searchApiStatus = null;
   let searchResponseSettled = false;
   let observationRelay = Promise.resolve();
+  const RESULT_STABILITY_POLLS = 4;
 
   function setObserverEnabled(enabled) {
     if (!observerToken) return;
@@ -102,6 +104,170 @@
       };
       check();
     });
+  }
+
+  function textDigest(value) {
+    const text = String(value ?? "").slice(0, 4_000);
+    let hash = 2_166_136_261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16_777_619);
+    }
+    return `${text.length}:${hash >>> 0}`;
+  }
+
+  function isVisibleElement(element) {
+    if (
+      !element ||
+      element.hidden ||
+      element.getAttribute?.("aria-hidden") === "true"
+    ) {
+      return false;
+    }
+    const style = window.getComputedStyle?.(element);
+    if (
+      style &&
+      (style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.opacity === "0")
+    ) {
+      return false;
+    }
+    if (
+      typeof element.getClientRects === "function" &&
+      element.getClientRects().length === 0
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function visibleErrorMarkers() {
+    return [
+      ...document.querySelectorAll(
+        '.Toastify__toast--error, .Toastify__toast, [role="alert"]',
+      ),
+    ].filter(
+      (element) => {
+        if (!isVisibleElement(element)) return false;
+        const explicitError =
+          element.matches?.(".Toastify__toast--error") ||
+          element.classList?.contains("Toastify__toast--error");
+        return (
+          explicitError ||
+          /invalid|incorrect|expired|error|failed|rejected|mismatch|try again|too many|unavailable/i.test(
+            element.textContent ?? "",
+          )
+        );
+      },
+    );
+  }
+
+  function freshErrorMarkerPresent(initialErrors, mutationTracker) {
+    return visibleErrorMarkers().some(
+      (element) =>
+        !initialErrors.has(element) ||
+        initialErrors.get(element) !== textDigest(element.textContent) ||
+        mutationTracker.wasMutated(element),
+    );
+  }
+
+  function visibleNoResultMarkers() {
+    return [...document.querySelectorAll("h4")].filter(
+      (element) =>
+        isVisibleElement(element) &&
+        (element.textContent ?? "").trim() === "No Result Found",
+    );
+  }
+
+  function tableFingerprint(table) {
+    if (!table) return "";
+    const headers = [...table.querySelectorAll("thead th, thead td")];
+    const rows = [...table.querySelectorAll("tbody tr")];
+    const structure = rows.map((row) =>
+      [...row.querySelectorAll("td")]
+        .map((cell) => textDigest((cell.textContent ?? "").trim()))
+        .join(","),
+    );
+    return `${headers.length}|${rows.length}|${structure.join(";")}`;
+  }
+
+  function snapshotResultState() {
+    const table = document.querySelector("table#table-id");
+    const visibleTable = isVisibleElement(table) ? table : null;
+    return {
+      noResultNodes: new Set(visibleNoResultMarkers()),
+      errors: new Map(
+        visibleErrorMarkers().map((element) => [
+          element,
+          textDigest(element.textContent),
+        ]),
+      ),
+      table: visibleTable,
+      tableFingerprint: tableFingerprint(visibleTable),
+    };
+  }
+
+  function createResultMutationTracker(initialResultState) {
+    const trackedNodes = [
+      ...initialResultState.noResultNodes,
+      ...initialResultState.errors.keys(),
+      initialResultState.table,
+    ].filter(Boolean);
+    const mutatedNodes = new WeakSet();
+    const recordTouchesNode = (record, node) => {
+      if (
+        record.target === node ||
+        Boolean(node?.contains?.(record.target))
+      ) {
+        return true;
+      }
+      if (record.type !== "childList") return false;
+      return [...(record.addedNodes ?? []), ...(record.removedNodes ?? [])].some(
+        (changedNode) =>
+          changedNode === node ||
+          Boolean(changedNode?.contains?.(node)) ||
+          Boolean(node?.contains?.(changedNode)),
+      );
+    };
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of trackedNodes) {
+          if (recordTouchesNode(record, node)) mutatedNodes.add(node);
+        }
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["aria-hidden", "class", "hidden", "style"],
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
+    return {
+      disconnect() {
+        observer.disconnect();
+      },
+      wasMutated(node) {
+        return mutatedNodes.has(node);
+      },
+    };
+  }
+
+  function apiFailureMessage(status) {
+    if (status === 0) {
+      return "The official ECI request received no HTTP response (status 0). Check the network and try again; no result was recorded.";
+    }
+    if (status === 429) {
+      return "The official ECI service rate-limited this search (HTTP 429). Wait before trying again; no result was recorded.";
+    }
+    if (status >= 500) {
+      return `The official ECI service returned HTTP ${status}. This appears to be a service-side failure; no result was recorded.`;
+    }
+    if (status >= 400) {
+      return `The official ECI service rejected this search with HTTP ${status}. The CAPTCHA or another form value may have been rejected; no result was recorded.`;
+    }
+    return `The official ECI search returned HTTP ${status} instead of a successful 2xx response. No result was recorded.`;
   }
 
   function setNativeValue(element, value) {
@@ -274,7 +440,8 @@
     if ([nameIndex, ageIndex, districtIndex, constituencyIndex].some((index) => index < 0)) {
       throw new Error("The official ECI results format changed and could not be minimized.");
     }
-    return [...table.querySelectorAll("tbody tr")].slice(0, 10).map((row, index) => {
+    const rows = [...table.querySelectorAll("tbody tr")];
+    const candidates = rows.slice(0, 10).map((row, index) => {
       const cells = [...row.querySelectorAll("td")];
       return {
         id: `candidate-${String(index + 1).padStart(2, "0")}`,
@@ -286,30 +453,88 @@
         matchedOn: ["selected name", "relative name", "birth detail"],
       };
     });
+    return {
+      candidates,
+      resultLimitReached: rows.length >= 10,
+    };
   }
 
-  async function waitForResults() {
+  async function waitForResults(initialResultState, mutationTracker) {
     let outcome;
+    let stableOutcomeKey = "";
+    let stableOutcomeNode = null;
+    let stableOutcomePolls = 0;
     try {
       outcome = await waitFor(() => {
         const spinner = document.querySelector(".globalSpinnerDiv");
         if (searchApiStatus === null) return null;
         if (searchApiStatus < 200 || searchApiStatus >= 300) {
-          return { type: "api-error" };
+          return { type: "api-error", status: searchApiStatus };
         }
         if (
           spinner ||
           !searchResponseSettled
         ) {
+          stableOutcomeKey = "";
+          stableOutcomeNode = null;
+          stableOutcomePolls = 0;
           return null;
         }
-        if (document.querySelector(".Toastify__toast--error")) return { type: "error" };
+        if (
+          freshErrorMarkerPresent(
+            initialResultState.errors,
+            mutationTracker,
+          )
+        ) {
+          return { type: "error" };
+        }
         const table = document.querySelector("table#table-id");
-        if (table) return { type: "table", table };
-        const noResult = [...document.querySelectorAll("h4")].some(
-          (element) => (element.textContent ?? "").trim() === "No Result Found",
+        const visibleTable = isVisibleElement(table) ? table : null;
+        const rows = visibleTable
+          ? [...visibleTable.querySelectorAll("tbody tr")]
+          : [];
+        const currentTableFingerprint = tableFingerprint(visibleTable);
+        const currentNoResultMarkers = visibleNoResultMarkers();
+        const freshNoResultMarker = currentNoResultMarkers.find(
+          (element) =>
+            !initialResultState.noResultNodes.has(element) ||
+            mutationTracker.wasMutated(element),
         );
-        return noResult ? { type: "empty" } : null;
+        let candidate = null;
+        let candidateKey = "";
+        let candidateNode = null;
+        if (
+          visibleTable &&
+          rows.length > 0 &&
+          (visibleTable !== initialResultState.table ||
+            currentTableFingerprint !== initialResultState.tableFingerprint ||
+            mutationTracker.wasMutated(visibleTable))
+        ) {
+          candidate = { type: "table", table: visibleTable };
+          candidateKey = `table:${currentTableFingerprint}`;
+          candidateNode = visibleTable;
+        } else if (freshNoResultMarker) {
+          candidate = { type: "empty" };
+          candidateKey = `empty:${currentNoResultMarkers.length}`;
+          candidateNode = freshNoResultMarker;
+        }
+        if (!candidate) {
+          stableOutcomeKey = "";
+          stableOutcomeNode = null;
+          stableOutcomePolls = 0;
+          return null;
+        }
+        if (
+          candidateKey !== stableOutcomeKey ||
+          candidateNode !== stableOutcomeNode
+        ) {
+          stableOutcomeKey = candidateKey;
+          stableOutcomeNode = candidateNode;
+          stableOutcomePolls = 1;
+          return null;
+        }
+        stableOutcomePolls += 1;
+        return stableOutcomePolls >= RESULT_STABILITY_POLLS ? candidate : null;
       }, 30_000);
     } catch (error) {
       if (searchApiStatus === null) {
@@ -317,14 +542,24 @@
           "The official ECI search API call was not observed, so this attempt was not completed.",
         );
       }
+      if (searchApiStatus >= 200 && searchApiStatus < 300) {
+        throw new Error(
+          `The official ECI API returned HTTP ${searchApiStatus}, but the page did not expose a fresh, stable result or explicit no-result marker. No result was recorded.`,
+        );
+      }
       throw error;
     }
-    if (outcome.type === "api-error" || outcome.type === "error") {
+    if (outcome.type === "api-error") {
+      throw new Error(apiFailureMessage(outcome.status));
+    }
+    if (outcome.type === "error") {
       throw new Error(
-        "The official site rejected the submission, often because the CAPTCHA expired or was incorrect. Try the next planned search or restart.",
+        `The official ECI page displayed a validation error after HTTP ${searchApiStatus}. The CAPTCHA or another form value may have been rejected; no result was recorded.`,
       );
     }
-    return outcome.type === "empty" ? [] : parseCandidates(outcome.table);
+    return outcome.type === "empty"
+      ? { candidates: [], resultLimitReached: false }
+      : parseCandidates(outcome.table);
   }
 
   async function reportError(requestId, error) {
@@ -372,6 +607,49 @@
       return;
     }
 
+    if (message.type === "REFRESH_CAPTCHA") {
+      if (
+        phase !== "captcha" ||
+        message.requestId !== activeRequestId ||
+        captchaRefreshInFlight
+      ) {
+        return;
+      }
+      captchaRefreshInFlight = true;
+      void (async () => {
+        const previousImage =
+          document
+            .querySelector('.captcha-div img[src^="data:image/"]')
+            ?.getAttribute("src") ?? "";
+        const refreshControl = await waitFor(() =>
+          document.querySelector(
+            '.captcha-div [role="button"][aria-label="Captcha Refresh"]',
+          ),
+        );
+        refreshControl.click();
+        const captchaImage = await waitFor(() => {
+          const source =
+            document
+              .querySelector('.captcha-div img[src^="data:image/"]')
+              ?.getAttribute("src") ?? "";
+          return source !== previousImage && protocol.isCaptchaDataImage(source)
+            ? source
+            : null;
+        }, 15_000);
+        await chrome.runtime.sendMessage({
+          source: "eci-driver",
+          type: "CAPTCHA_READY",
+          requestId: activeRequestId,
+          captchaImage,
+        });
+      })()
+        .catch((error) => reportError(activeRequestId, error))
+        .finally(() => {
+          captchaRefreshInFlight = false;
+        });
+      return;
+    }
+
     if (message.type === "SUBMIT") {
       if (
         phase !== "captcha" ||
@@ -395,8 +673,15 @@
         setNativeValue(input, message.captchaAnswer);
         observerToken = crypto.randomUUID();
         setObserverEnabled(true);
-        search.click();
-        const candidates = await waitForResults();
+        const initialResultState = snapshotResultState();
+        const mutationTracker = createResultMutationTracker(initialResultState);
+        let result;
+        try {
+          search.click();
+          result = await waitForResults(initialResultState, mutationTracker);
+        } finally {
+          mutationTracker.disconnect();
+        }
         await settleObservationRelay();
         setObserverEnabled(false);
         phase = "closed";
@@ -404,7 +689,8 @@
           source: "eci-driver",
           type: "RESULTS",
           requestId: activeRequestId,
-          candidates,
+          candidates: result.candidates,
+          resultLimitReached: result.resultLimitReached,
         });
       })().catch((error) => reportError(activeRequestId, error));
     }

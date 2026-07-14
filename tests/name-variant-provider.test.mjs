@@ -29,7 +29,7 @@ const validAiSuggestions = {
   ],
 };
 
-test("variant boundary requires explicit opt-in and accepts at most six names", () => {
+test("variant boundary requires an explicit AI request and accepts at most six names", () => {
   assert.deepEqual(validateNameVariantRequest(validRequest), validRequest);
   assert.equal(
     validateNameVariantRequest({ ...validRequest, aiOptIn: false }),
@@ -46,45 +46,70 @@ test("variant boundary requires explicit opt-in and accepts at most six names", 
   assert.equal(bounded.relativeNames.length, MAX_RELATIVE_IDENTITIES);
 });
 
-test("deterministic fallback returns server-assigned provenance and groups", async () => {
+test("unavailable AI uses bounded generic fallback in every supported script", async () => {
   const provider = new UnavailableAiNameVariantProvider();
   let called = false;
   provider.suggest = async () => {
     called = true;
     return validAiSuggestions;
   };
-  const result = await suggestNameVariants(validRequest, provider);
+  const cases = [
+    { state: "karnataka", script: /[\u0c80-\u0cff]/ },
+    { state: "west_bengal", script: /[\u0980-\u09ff]/ },
+    { state: "odisha", script: /[\u0b00-\u0b7f]/ },
+  ];
+  for (const { state, script } of cases) {
+    const result = await suggestNameVariants(
+      {
+        state,
+        voterName: "Naren Dal",
+        relativeNames: ["Pavan Sen"],
+        aiOptIn: true,
+      },
+      provider,
+    );
+    assert.equal(result.ai.status, "not_configured");
+    assert.equal(result.voterCandidates[0].value, "Naren Dal");
+    assert.equal(result.voterCandidates[0].source, "entered");
+    assert.ok(
+      result.voterCandidates.some(
+        (candidate) =>
+          candidate.source === "local-transliteration" &&
+          script.test(candidate.value),
+      ),
+    );
+    assert.ok(result.voterCandidates.length <= MAX_VARIANTS_PER_NAME);
+    assert.ok(
+      result.relativeGroups.every(
+        (group) => group.candidates.length <= MAX_CANDIDATES_PER_RELATIVE,
+      ),
+    );
+    assert.equal(result.limits.plannedSearches, MAX_PLANNED_SEARCHES);
+  }
   assert.equal(called, false);
-  assert.equal(result.ai.status, "not_configured");
-  assert.equal(result.voterCandidates[0].value, "Ramesh");
-  assert.equal(result.voterCandidates[0].source, "entered");
-  assert.ok(
-    result.voterCandidates.some(
-      (candidate) => candidate.source === "local-transliteration",
-    ),
-  );
-  assert.deepEqual(
-    result.relativeGroups.map((group) => group.relativeId),
-    ["r1", "r2"],
-  );
-  assert.equal(result.relativeGroups[0].candidates[0].value, "Suresh");
-  assert.equal(result.relativeGroups[0].candidates[0].source, "entered");
-  assert.ok(result.voterCandidates.length <= MAX_VARIANTS_PER_NAME);
-  assert.ok(
-    result.relativeGroups.every(
-      (group) => group.candidates.length <= MAX_CANDIDATES_PER_RELATIVE,
-    ),
-  );
-  assert.deepEqual(
-    result.relativeNameVariants,
-    result.relativeGroups.flatMap((group) =>
-      group.candidates.map((candidate) => candidate.value),
-    ),
-  );
-  assert.equal(result.limits.plannedSearches, MAX_PLANNED_SEARCHES);
 });
 
-test("provider receives opaque IDs and duplicate values retain local provenance", async () => {
+test("configured AI failure falls back without retrying or exposing the error", async () => {
+  let calls = 0;
+  const result = await suggestNameVariants(validRequest, {
+    isConfigured: () => true,
+    suggest: async () => {
+      calls += 1;
+      throw new Error("private provider failure");
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ai.status, "fallback");
+  assert.equal(result.ai.used, false);
+  assert.ok(
+    result.voterCandidates.slice(1).every((candidate) =>
+      candidate.source.startsWith("local-"),
+    ),
+  );
+  assert.equal(JSON.stringify(result).includes("private provider failure"), false);
+});
+
+test("provider receives opaque IDs and AI suggestions follow entered values", async () => {
   const provider = {
     isConfigured: () => true,
     suggest: async (input) => {
@@ -98,6 +123,16 @@ test("provider receives opaque IDs and duplicate values retain local provenance"
   };
   const result = await suggestNameVariants(validRequest, provider);
   assert.equal(result.ai.status, "generated");
+  assert.deepEqual(
+    result.voterCandidates.slice(0, 2).map((candidate) => candidate.source),
+    ["entered", "ai"],
+  );
+  assert.ok(
+    [
+      ...result.voterCandidates.slice(1),
+      ...result.relativeGroups.flatMap((group) => group.candidates.slice(1)),
+    ].every((candidate) => candidate.source === "ai"),
+  );
   assert.equal(
     result.voterCandidates.find((candidate) => candidate.value === "Ramesh")
       .source,
@@ -118,7 +153,7 @@ test("provider receives opaque IDs and duplicate values retain local provenance"
   );
 });
 
-test("entered and local transliteration provenance outrank duplicate AI output", async () => {
+test("entered values remain entered while AI outranks matching generic output", async () => {
   const result = await suggestNameVariants(
     {
       state: "karnataka",
@@ -131,7 +166,7 @@ test("entered and local transliteration provenance outrank duplicate AI output",
       suggest: async () => ({
         voterNameVariants: ["Amit", "ಅಮಿತ"],
         relativeGroups: [
-          { relativeId: "r1", variants: ["Suman", "ಸುಮನ್"] },
+          { relativeId: "r1", variants: ["Suman", "ಸುಮನ"] },
         ],
       }),
     },
@@ -144,7 +179,19 @@ test("entered and local transliteration provenance outrank duplicate AI output",
   assert.equal(
     result.voterCandidates.find((candidate) => candidate.value === "ಅಮಿತ")
       .source,
-    "local-transliteration",
+    "ai",
+  );
+  assert.equal(
+    result.relativeGroups[0].candidates.find(
+      (candidate) => candidate.value === "ಸುಮನ",
+    ).source,
+    "ai",
+  );
+  assert.equal(
+    result.voterCandidates.some((candidate) =>
+      candidate.source.startsWith("local-"),
+    ),
+    false,
   );
 });
 
@@ -196,6 +243,10 @@ test("Cloudflare adapter sends grouped opaque IDs and strict grouped schema", as
   assert.equal(
     schema.properties.relativeGroups.items.properties.variants.maxItems,
     MAX_CANDIDATES_PER_RELATIVE,
+  );
+  assert.match(
+    invocation.input.messages[0].content,
+    /Never introduce or discard a name component/,
   );
   assert.deepEqual(suggestions, validAiSuggestions);
 });
@@ -263,9 +314,12 @@ test("state-script coverage is enforced inside every relative group", () => {
     {
       state: "west_bengal",
       suggestions: {
-        voterNameVariants: ["Amit Mitra", "অমিত মিত্র"],
+        voterNameVariants: ["Example Voter", "উদাহরণ ভোটার"],
         relativeGroups: [
-          { relativeId: "r1", variants: ["Suman Mitra", "সুমন মিত্র"] },
+          {
+            relativeId: "r1",
+            variants: ["Example Relative", "উদাহরণ আত্মীয়"],
+          },
         ],
       },
     },
@@ -288,9 +342,12 @@ test("state-script coverage is enforced inside every relative group", () => {
   assert.throws(() =>
     assertStateScriptCoverage(
       {
-        voterNameVariants: ["Amit Mitra", "অমিত মিত্র"],
+        voterNameVariants: ["Example Voter", "উদাহরণ ভোটার"],
         relativeGroups: [
-          { relativeId: "r1", variants: ["Suman Mitra", "ಸುಮನ್ ಮಿತ್ರ"] },
+          {
+            relativeId: "r1",
+            variants: ["Example Relative", "ಉದಾಹರಣೆ ಸಂಬಂಧಿ"],
+          },
         ],
       },
       "west_bengal",
@@ -335,7 +392,49 @@ test("AI additions remain capped per identity and are server-labelled", async ()
   ];
   assert.ok(allCandidates.every((candidate) => candidate.source));
   assert.equal(
+    allCandidates.some((candidate) =>
+      ["Ramesh K", "Ramesh Kumar", "Suresh K"].includes(candidate.value),
+    ),
+    false,
+  );
+  assert.equal(
     allCandidates.some((candidate) => candidate.source === "untrusted-model"),
     false,
   );
+});
+
+test("dictionary-free identity validation drops added or unrelated AI names", async () => {
+  const result = await suggestNameVariants(
+    {
+      state: "west_bengal",
+      voterName: "Naren Dal",
+      relativeNames: ["Pavan Sen"],
+      aiOptIn: true,
+    },
+    {
+      isConfigured: () => true,
+      suggest: async () => ({
+        voterNameVariants: [
+          "Naren Dal",
+          "নরেন দাল",
+          "Naren Dhal",
+          "Narendralal",
+          "উদাহরণ ভোটার",
+        ],
+        relativeGroups: [
+          {
+            relativeId: "r1",
+            variants: ["Pavan Sen", "পাবন সেন", "Paban Sen", "Entirely Different"],
+          },
+        ],
+      }),
+    },
+  );
+
+  assert.equal(result.ai.status, "generated");
+  assert.ok(result.voterNameVariants.includes("Naren Dhal"));
+  assert.ok(result.voterNameVariants.includes("নরেন দাল"));
+  assert.equal(result.voterNameVariants.includes("Narendralal"), false);
+  assert.equal(result.voterNameVariants.includes("উদাহরণ ভোটার"), false);
+  assert.equal(result.relativeNameVariants.includes("Entirely Different"), false);
 });
