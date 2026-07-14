@@ -23,7 +23,7 @@ AI-first spelling generation occurs in the web app after the user chooses its cl
 
 The companion requires Chrome 111 or later (or a compatible Chromium browser) for its narrow main-world content script.
 
-SIR Assist should now show **Browser companion connected**. If it does not, confirm that the extension is enabled, reload the SIR Assist tab, and use **Check connection again**.
+SIR Assist should now show **Browser companion connected**. If it does not, confirm that the extension is enabled and use **Reload page to detect extension**. Chrome injects the companion bridge only when the SIR Assist page loads, so an already-open tab cannot detect a newly installed or reloaded unpacked extension without a page reload.
 
 The production manifest runs content scripts only on the deployed SIR Assist origin and `https://electoralsearch.eci.gov.in/`. It does not request cookies, browsing history, web-request interception, debugger access, or access to unrelated sites.
 

@@ -581,7 +581,6 @@ export function SearchAssistant() {
   const searchQueueRef = useRef<SearchAttempt[]>([]);
   const activeAttemptIndexRef = useRef(-1);
   const startTimeoutRef = useRef<number | null>(null);
-  const connectionRetryTimeoutRef = useRef<number | null>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
   const t = copy[locale];
   const currentStep = stepIndex(step);
@@ -670,10 +669,6 @@ export function SearchAssistant() {
       const message = parseExtensionMessage(event);
       if (!message) return;
       if (message.type === "READY") {
-        if (connectionRetryTimeoutRef.current !== null) {
-          window.clearTimeout(connectionRetryTimeoutRef.current);
-          connectionRetryTimeoutRef.current = null;
-        }
         setExtensionState("available");
         setExtensionVersion(message.version);
         return;
@@ -779,9 +774,6 @@ export function SearchAssistant() {
     sendExtensionMessage({ type: "PING" });
     return () => {
       clearStartTimeout();
-      if (connectionRetryTimeoutRef.current !== null) {
-        window.clearTimeout(connectionRetryTimeoutRef.current);
-      }
       window.clearTimeout(detectionTimeout);
       window.removeEventListener("message", receiveExtensionMessage);
     };
@@ -845,19 +837,8 @@ export function SearchAssistant() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function checkExtensionAgain() {
-    if (connectionRetryTimeoutRef.current !== null) {
-      window.clearTimeout(connectionRetryTimeoutRef.current);
-    }
-    setExtensionState("checking");
-    setExtensionVersion("");
-    sendExtensionMessage({ type: "PING" });
-    connectionRetryTimeoutRef.current = window.setTimeout(() => {
-      setExtensionState((current) =>
-        current === "checking" ? "missing" : current,
-      );
-      connectionRetryTimeoutRef.current = null;
-    }, 1_200);
+  function reloadPageForExtension() {
+    window.location.reload();
   }
 
   async function prepareVariants(event: FormEvent) {
@@ -1179,7 +1160,7 @@ export function SearchAssistant() {
                 state={extensionState}
                 version={extensionVersion}
                 needsUpdate={extensionNeedsUpdate}
-                onRetry={checkExtensionAgain}
+                onReload={reloadPageForExtension}
               />
 
               <div className="state-grid" role="group" aria-label="State">
@@ -1438,8 +1419,10 @@ export function SearchAssistant() {
                       >
                         Download browser companion
                       </a>
-                      <button className="extension-retry" type="button" onClick={checkExtensionAgain}>
-                        Check connection again
+                      <button className="extension-retry" type="button" onClick={reloadPageForExtension}>
+                        {extensionNeedsUpdate
+                          ? `Reload page to detect v${minimumExtensionVersion}`
+                          : "Reload page to detect extension"}
                       </button>
                     </span>
                   )}
@@ -1783,12 +1766,12 @@ function ExtensionPreflight({
   state,
   version,
   needsUpdate,
-  onRetry,
+  onReload,
 }: {
   state: ExtensionState;
   version: string;
   needsUpdate: boolean;
-  onRetry: () => void;
+  onReload: () => void;
 }) {
   return (
     <section className={`extension-preflight ${needsUpdate ? "update-required" : state}`} aria-labelledby="extension-preflight-title">
@@ -1822,8 +1805,8 @@ function ExtensionPreflight({
             <a className="extension-download-button" href="/sir-assist-browser-companion.zip" download>
               Download v{minimumExtensionVersion}
             </a>
-            <button className="extension-retry" type="button" onClick={onRetry}>
-              Check connection again
+            <button className="extension-retry" type="button" onClick={onReload}>
+              Reload page to detect v{minimumExtensionVersion}
             </button>
           </div>
         </div>
@@ -1846,8 +1829,8 @@ function ExtensionPreflight({
             <a className="extension-download-button" href="/sir-assist-browser-companion.zip" download>
               Download browser companion
             </a>
-            <button className="extension-retry" type="button" onClick={onRetry}>
-              Check connection again
+            <button className="extension-retry" type="button" onClick={onReload}>
+              Reload page to detect extension
             </button>
           </div>
         </div>

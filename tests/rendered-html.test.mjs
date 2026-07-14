@@ -28,7 +28,10 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Install the browser companion before searching/);
   assert.match(assistant, /Why it is needed:/);
   assert.match(assistant, /chrome:\/\/extensions/);
-  assert.match(assistant, /Check connection again/);
+  assert.match(assistant, /Reload page to detect extension/);
+  assert.match(assistant, /Reload page to detect v\{minimumExtensionVersion\}/);
+  assert.match(assistant, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(assistant, /Check connection again/);
   assert.match(assistant, /It cannot solve CAPTCHAs, read unrelated websites/);
   assert.match(assistant, /Planned search queue/);
   assert.match(assistant, /18 hard maximum/);
