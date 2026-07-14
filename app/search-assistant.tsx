@@ -332,7 +332,7 @@ const copy = {
       title: "Who does what",
       roles: [
         {
-          title: "SIR Assist cloud (Cloudflare Worker)",
+          title: "SIR Assist server",
           body: "Hosts this page and the extension download, and generates bounded AI spelling suggestions from only the selected state and entered names. It never receives DOB, age, gender, district, CAPTCHA data or ECI results, and it never searches ECI itself.",
         },
         {
@@ -390,7 +390,7 @@ const copy = {
       title: "ಯಾರು ಏನು ಮಾಡುತ್ತಾರೆ",
       roles: [
         {
-          title: "SIR Assist ಕ್ಲೌಡ್ (Cloudflare Worker)",
+          title: "SIR Assist ಸರ್ವರ್",
           body: "ಈ ಪುಟ ಮತ್ತು ಎಕ್ಸ್‌ಟೆನ್ಶನ್ ಡೌನ್‌ಲೋಡ್ ಅನ್ನು ಒದಗಿಸುತ್ತದೆ; ಆಯ್ದ ರಾಜ್ಯ ಮತ್ತು ನಮೂದಿಸಿದ ಹೆಸರುಗಳಿಂದ ಮಾತ್ರ ಸೀಮಿತ AI ಕಾಗುಣಿತ ಸಲಹೆಗಳನ್ನು ರಚಿಸುತ್ತದೆ. ಜನ್ಮ ದಿನಾಂಕ, ವಯಸ್ಸು, ಲಿಂಗ, ಜಿಲ್ಲೆ, CAPTCHA ಅಥವಾ ECI ಫಲಿತಾಂಶಗಳನ್ನು ಇದು ಎಂದಿಗೂ ಪಡೆಯುವುದಿಲ್ಲ; ತಾನೇ ECI ಹುಡುಕಾಟ ನಡೆಸುವುದಿಲ್ಲ.",
         },
         {
@@ -448,7 +448,7 @@ const copy = {
       title: "কে কী করে",
       roles: [
         {
-          title: "SIR Assist ক্লাউড (Cloudflare Worker)",
+          title: "SIR Assist সার্ভার",
           body: "এই পেজ ও এক্সটেনশন ডাউনলোড পরিবেশন করে এবং শুধু নির্বাচিত রাজ্য ও লেখা নামগুলি থেকে সীমিত AI বানান-পরামর্শ তৈরি করে। জন্মতারিখ, বয়স, লিঙ্গ, জেলা, CAPTCHA বা ECI ফলাফল এটি কখনও পায় না এবং নিজে ECI-তে অনুসন্ধানও করে না।",
         },
         {
@@ -506,7 +506,7 @@ const copy = {
       title: "କିଏ କଣ କରେ",
       roles: [
         {
-          title: "SIR Assist କ୍ଲାଉଡ୍ (Cloudflare Worker)",
+          title: "SIR Assist ସର୍ଭର",
           body: "ଏହି ପୃଷ୍ଠା ଓ ଏକ୍ସଟେନସନ୍ ଡାଉନଲୋଡ୍ ଯୋଗାଏ ଏବଂ କେବଳ ବଛା ରାଜ୍ୟ ଓ ଲେଖା ନାମରୁ ସୀମିତ AI ବନାନ ପରାମର୍ଶ ତିଆରି କରେ। ଜନ୍ମତାରିଖ, ବୟସ, ଲିଙ୍ଗ, ଜିଲ୍ଲା, CAPTCHA କିମ୍ବା ECI ଫଳାଫଳ ଏହା କେବେ ପାଏ ନାହିଁ; ନିଜେ ECI ସନ୍ଧାନ କରେ ନାହିଁ।",
         },
         {
@@ -610,6 +610,7 @@ export function SearchAssistant() {
   const activeAttemptIndexRef = useRef(-1);
   const startTimeoutRef = useRef<number | null>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const captchaInputRef = useRef<HTMLInputElement>(null);
   const t = copy[locale];
   const currentStep = stepIndex(step);
   const stateLabel = stateOptions.find((item) => item.value === form.state)!;
@@ -811,6 +812,19 @@ export function SearchAssistant() {
     if (step !== "results") return;
     window.requestAnimationFrame(() => resultsHeadingRef.current?.focus());
   }, [step]);
+
+  // Bring every fresh CAPTCHA (first load and refresh) into view with the
+  // answer field focused, so the image is readable and typing can start.
+  useEffect(() => {
+    if (step !== "captcha" || !captchaImage) return;
+    window.requestAnimationFrame(() => {
+      captchaInputRef.current?.focus();
+      captchaInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }, [captchaImage, step]);
 
   useEffect(() => {
     if (!cooldownUntil) return;
@@ -1507,6 +1521,7 @@ export function SearchAssistant() {
                 <input
                   id="captcha"
                   name="captcha"
+                  ref={captchaInputRef}
                   value={captchaAnswer}
                   onChange={(event) => setCaptchaAnswer(event.target.value)}
                   autoComplete="off"

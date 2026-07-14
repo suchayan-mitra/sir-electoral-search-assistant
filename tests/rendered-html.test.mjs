@@ -76,6 +76,10 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /sir-assist-browser-companion\.zip/);
   assert.match(assistant, /minimumExtensionVersion = "1\.6\.0"/);
   assert.match(assistant, /Show a new CAPTCHA/);
+  assert.match(assistant, /captchaInputRef\.current\?\.focus\(\)/);
+  assert.match(assistant, /ref=\{captchaInputRef\}/);
+  assert.match(assistant, /SIR Assist server/);
+  assert.doesNotMatch(assistant, /Cloudflare/);
   assert.match(assistant, /type: "REFRESH_CAPTCHA", requestId: caseId/);
   assert.match(assistant, /RATE_LIMIT_COOLDOWN_MS = 60_000/);
   assert.match(assistant, /rate-limited the last attempt \(HTTP 429\)/);
