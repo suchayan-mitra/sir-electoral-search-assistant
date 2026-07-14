@@ -18,7 +18,19 @@
   const API_OBSERVER_CONTROL_EVENT = "sir-assist-api-observer-control";
   const API_OBSERVATION_EVENT = "sir-assist-api-observation";
   const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const STATES = new Set(["karnataka", "west_bengal", "odisha"]);
+  const STATES = new Set([
+    "karnataka",
+    "west_bengal",
+    "odisha",
+    "bihar",
+    "chhattisgarh",
+    "delhi",
+    "jharkhand",
+    "madhya_pradesh",
+    "rajasthan",
+    "uttar_pradesh",
+    "uttarakhand",
+  ]);
   const GENDERS = new Set(["female", "male", "other"]);
   const SEARCH_KEYS = new Set([
     "state",

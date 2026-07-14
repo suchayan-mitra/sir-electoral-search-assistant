@@ -72,6 +72,14 @@ const stateCodes: Record<SearchRequest["state"], string> = {
   karnataka: "S10",
   west_bengal: "S25",
   odisha: "S18",
+  bihar: "S04",
+  chhattisgarh: "S26",
+  delhi: "U05",
+  jharkhand: "S27",
+  madhya_pradesh: "S12",
+  rajasthan: "S20",
+  uttar_pradesh: "S24",
+  uttarakhand: "S28",
 };
 
 const genderCodes: Record<SearchRequest["gender"], string> = {

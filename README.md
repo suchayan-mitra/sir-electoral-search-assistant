@@ -1,6 +1,6 @@
 # SIR Assist
 
-**SIR Assist — Electoral Search Companion** is an independent, privacy-minded electoral-search assistant for Karnataka, West Bengal, and Odisha. It generates bounded spelling/transliteration variants and uses a local browser companion to complete a user-approved sequence of human-controlled searches on the official Election Commission of India (ECI) page.
+**SIR Assist — Electoral Search Companion** is an independent, privacy-minded electoral-search assistant for Karnataka, West Bengal, Odisha, and the major Hindi-belt states (Bihar, Uttar Pradesh, Madhya Pradesh, Rajasthan, Jharkhand, Chhattisgarh, Uttarakhand, and NCT of Delhi). It generates bounded spelling/transliteration variants and uses a local browser companion to complete a user-approved sequence of human-controlled searches on the official Election Commission of India (ECI) page.
 
 Deployed beta: <https://sir-electoral-search-assistant.jukulda.workers.dev>
 

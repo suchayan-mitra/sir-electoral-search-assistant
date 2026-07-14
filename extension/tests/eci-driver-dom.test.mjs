@@ -485,6 +485,20 @@ test("ECI driver verifies the age branch before relaying CAPTCHA", async () => {
   assert.equal(elements.male.checked, true);
 });
 
+test("ECI driver fills a Hindi-belt state search with its audited code", async () => {
+  const { elements, fill } = createHarness();
+  const outcome = await fill({
+    state: "bihar",
+    name: "Example Voter",
+    relativeName: "Example Relative",
+    age: 42,
+    gender: "male",
+  });
+
+  assert.equal(outcome.type, "CAPTCHA_READY");
+  assert.equal(elements.state.value, "S04");
+});
+
 test("ECI driver verifies the DOB and district branch before relaying CAPTCHA", async () => {
   const { elements, fill } = createHarness();
   const outcome = await fill({

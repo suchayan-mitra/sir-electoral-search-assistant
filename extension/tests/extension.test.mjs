@@ -101,6 +101,10 @@ test("ECI driver fills the official form and minimizes approved fields", async (
   assert.match(driver, /resultLimitReached: rows\.length >= 10/);
   assert.match(driver, /RESULT_STABILITY_POLLS = 4/);
   assert.match(driver, /rate-limited this search \(HTTP 429\)/);
+  // Hindi-belt state codes audited from the official #stateID dropdown.
+  assert.match(driver, /bihar: "S04"/);
+  assert.match(driver, /uttar_pradesh: "S24"/);
+  assert.match(driver, /delhi: "U05"/);
   assert.doesNotMatch(driver, /epicNumber|polling|serialNumber|address/i);
 });
 

@@ -24,6 +24,10 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Karnataka/);
   assert.match(assistant, /West Bengal/);
   assert.match(assistant, /Odisha/);
+  assert.match(assistant, /Bihar/);
+  assert.match(assistant, /Uttar Pradesh/);
+  assert.match(assistant, /Delhi \(NCT\)/);
+  assert.match(assistant, /हिन्दी · Hindi/);
   assert.match(assistant, /Browser companion connected/);
   assert.match(assistant, /Install the browser companion before searching/);
   assert.match(assistant, /Why it is needed:/);
@@ -85,6 +89,11 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /No official result was recorded/);
   assert.match(assistant, /failed or expired attempt—not a zero-match response/);
   assert.match(assistant, /Official API call observed/);
+  assert.match(assistant, /transport diagnostic, not a search result/);
+  assert.match(
+    assistant,
+    /whether the record was found is stated in the summary above/,
+  );
   assert.match(assistant, /apiStatus: apiObservationRef\.current\?\.status/);
   assert.match(assistant, /after an observed HTTP 2xx response/);
   assert.match(assistant, /human-entered CAPTCHA submission/);
@@ -122,6 +131,13 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(worker, /extensionRequired: true/);
   assert.doesNotMatch(assistant, /codex-preview|react-loading-skeleton|ChatGPT|mock search/i);
 
+  // The possible-match summary is the headline of the results step; the
+  // network observation renders after it as a quiet transport diagnostic.
+  const matchSummaryPosition = assistant.indexOf("possible-match-summary ${");
+  const apiPanelPosition = assistant.indexOf("official-api-verification ${");
+  assert.ok(matchSummaryPosition >= 0);
+  assert.ok(apiPanelPosition > matchSummaryPosition);
+
   // A trusted DOB must consume the first CAPTCHA-backed attempt; guessed ages
   // only run after it.
   const ageCriterionPosition = assistant.indexOf(
@@ -138,6 +154,16 @@ test("extension protocol accepts one selected bounded search", () => {
   assert.equal(
     extensionProtocol.validSearch({
       state: "west_bengal",
+      name: "Example",
+      relativeName: "Relative",
+      age: 45,
+      gender: "female",
+    }),
+    true,
+  );
+  assert.equal(
+    extensionProtocol.validSearch({
+      state: "bihar",
       name: "Example",
       relativeName: "Relative",
       age: 45,
@@ -182,6 +208,16 @@ test("validates one bounded official search input", () => {
   );
   assert.equal(
     validateSearchInput({
+      state: "uttar_pradesh",
+      name: "Example",
+      relativeName: "Relative",
+      age: 40,
+      gender: "male",
+    }),
+    true,
+  );
+  assert.equal(
+    validateSearchInput({
       state: "karnataka",
       name: "Example",
       relativeName: "Relative",
@@ -214,16 +250,43 @@ test("validates one bounded official search input", () => {
 });
 
 test("generates bounded state-script variants", () => {
-  assert.deepEqual(supportedStates, ["karnataka", "west_bengal", "odisha"]);
+  assert.deepEqual(supportedStates, [
+    "karnataka",
+    "west_bengal",
+    "odisha",
+    "bihar",
+    "chhattisgarh",
+    "delhi",
+    "jharkhand",
+    "madhya_pradesh",
+    "rajasthan",
+    "uttar_pradesh",
+    "uttarakhand",
+  ]);
   assert.equal(transliterateToStateScript("Amit", "karnataka"), "ಅಮಿತ");
   assert.equal(transliterateToStateScript("Amit", "west_bengal"), "অমিত");
   assert.equal(transliterateToStateScript("Amit", "odisha"), "ଅମିତ");
+  // Every Hindi-belt state shares the same generic Devanagari table.
+  assert.equal(transliterateToStateScript("Amit", "bihar"), "अमित");
+  assert.equal(transliterateToStateScript("Amit", "uttar_pradesh"), "अमित");
+  const hindiForms = generateVariants("Sudipta", "rajasthan", 6);
+  assert.ok(hindiForms.includes("सुदिप्त"));
+  assert.ok(hindiForms.includes("सुदिप्ता"));
 
   const variants = generateVariants("Ramesh", "karnataka", 99);
   assert.ok(variants.includes("Ramesh"));
   assert.ok(variants.some((value) => /[\u0c80-\u0cff]/.test(value)));
   assert.ok(variants.length <= 6);
   assert.equal(new Set(variants).size, variants.length);
+
+  // A romanized final consonant + "a" is ambiguous between the inherent vowel
+  // and the aa-matra, so both native endings must be offered.
+  const odiaForms = generateVariants("Sudipta", "odisha", 6);
+  assert.ok(odiaForms.includes("\u0b38\u0b41\u0b26\u0b3f\u0b2a\u0b4d\u0b24"));
+  assert.ok(odiaForms.includes("\u0b38\u0b41\u0b26\u0b3f\u0b2a\u0b4d\u0b24\u0b3e"));
+  const bengaliForms = generateVariants("Sudipta Mitra", "west_bengal", 6);
+  assert.ok(bengaliForms.includes("\u09b8\u09c1\u09a6\u09bf\u09aa\u09cd\u09a4\u09be \u09ae\u09bf\u09a4\u09cd\u09b0"));
+  assert.ok(bengaliForms.includes("\u09b8\u09c1\u09a6\u09bf\u09aa\u09cd\u09a4\u09be \u09ae\u09bf\u09a4\u09cd\u09b0\u09be"));
 });
 
 test("preserves native-script input without inventing variants", () => {

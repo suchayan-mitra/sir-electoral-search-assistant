@@ -86,10 +86,22 @@ type RelativeVariantGroup = {
   candidates: VariantCandidate[];
 };
 
+const hindiScript = {
+  label: "Hindi",
+  letters: /[\u0904-\u0939\u0958-\u0961\u0972-\u097f]/,
+};
 const stateScript = {
   karnataka: { label: "Kannada", letters: /[\u0c85-\u0cb9\u0cde\u0ce0-\u0ce1]/ },
   west_bengal: { label: "Bengali", letters: /[\u0985-\u09b9\u09ce\u09dc-\u09df\u09f0-\u09f1]/ },
   odisha: { label: "Odia", letters: /[\u0b05-\u0b39\u0b5c-\u0b61\u0b71]/ },
+  bihar: hindiScript,
+  chhattisgarh: hindiScript,
+  delhi: hindiScript,
+  jharkhand: hindiScript,
+  madhya_pradesh: hindiScript,
+  rajasthan: hindiScript,
+  uttar_pradesh: hindiScript,
+  uttarakhand: hindiScript,
 } satisfies Record<SupportedState, { label: string; letters: RegExp }>;
 
 function variantScript(value: string, state: SupportedState): string {
@@ -267,6 +279,14 @@ const stateOptions: Array<{
   { value: "karnataka", native: "ಕರ್ನಾಟಕ", english: "Karnataka", language: "ಕನ್ನಡ" },
   { value: "west_bengal", native: "পশ্চিমবঙ্গ", english: "West Bengal", language: "বাংলা" },
   { value: "odisha", native: "ଓଡ଼ିଶା", english: "Odisha", language: "ଓଡ଼ିଆ" },
+  { value: "bihar", native: "बिहार", english: "Bihar", language: "हिन्दी" },
+  { value: "uttar_pradesh", native: "उत्तर प्रदेश", english: "Uttar Pradesh", language: "हिन्दी" },
+  { value: "madhya_pradesh", native: "मध्य प्रदेश", english: "Madhya Pradesh", language: "हिन्दी" },
+  { value: "rajasthan", native: "राजस्थान", english: "Rajasthan", language: "हिन्दी" },
+  { value: "jharkhand", native: "झारखण्ड", english: "Jharkhand", language: "हिन्दी" },
+  { value: "chhattisgarh", native: "छत्तीसगढ़", english: "Chhattisgarh", language: "हिन्दी" },
+  { value: "uttarakhand", native: "उत्तराखण्ड", english: "Uttarakhand", language: "हिन्दी" },
+  { value: "delhi", native: "दिल्ली", english: "Delhi (NCT)", language: "हिन्दी" },
 ];
 
 const copy = {
@@ -274,7 +294,7 @@ const copy = {
     eyebrow: "Multilingual electoral search assistance",
     title: "Find the spelling that finds the record.",
     intro:
-      "Prepare careful name variants across Kannada, Bengali and Odia, then try a bounded queue of human-controlled searches with the official service.",
+      "Prepare careful name variants across Kannada, Bengali, Odia and Hindi, then try a bounded queue of human-controlled searches with the official service.",
     steps: ["Details", "Variants", "CAPTCHA", "Matches"],
     trust: [
       "You—not automation—read and type every CAPTCHA.",
@@ -336,7 +356,7 @@ const copy = {
   kn: {
     eyebrow: "ಬಹುಭಾಷಾ ಮತದಾರರ ಹುಡುಕಾಟ ಸಹಾಯ",
     title: "ಸರಿಯಾದ ಕಾಗುಣಿತದಿಂದ ದಾಖಲೆಯನ್ನು ಹುಡುಕಿ.",
-    intro: "ಕನ್ನಡ, বাংলা ಮತ್ತು ଓଡ଼ିଆ ಹೆಸರು ರೂಪಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಿ, ನಂತರ ಹದಿನೆಂಟು ಮಾನವ-ನಿಯಂತ್ರಿತ ಹುಡುಕಾಟಗಳವರೆಗೆ ಪ್ರಯತ್ನಿಸಿ.",
+    intro: "ಕನ್ನಡ, বাংলা, ଓଡ଼ିଆ ಮತ್ತು हिन्दी ಹೆಸರು ರೂಪಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಿ, ನಂತರ ಹದಿನೆಂಟು ಮಾನವ-ನಿಯಂತ್ರಿತ ಹುಡುಕಾಟಗಳವರೆಗೆ ಪ್ರಯತ್ನಿಸಿ.",
     steps: ["ವಿವರ", "ರೂಪಗಳು", "CAPTCHA", "ಫಲಿತಾಂಶ"],
     trust: ["ಪ್ರತಿ CAPTCHA ಅನ್ನು ನೀವೇ ಓದಿ ನಮೂದಿಸುತ್ತೀರಿ.", "ಪ್ರತಿ ಪ್ರಕರಣಕ್ಕೆ ಹದಿನೆಂಟು ನಿಯಂತ್ರಿತ ಹುಡುಕಾಟಗಳವರೆಗೆ.", "ಪೂರ್ಣ ಮತದಾರರ ದಾಖಲೆ ಅಥವಾ ಇಮೇಲ್ ಇಲ್ಲ."],
     section: "ಹಂತ 1 / 4",
@@ -394,7 +414,7 @@ const copy = {
   bn: {
     eyebrow: "বহুভাষিক ভোটার অনুসন্ধান সহায়তা",
     title: "সঠিক বানানে সঠিক রেকর্ড খুঁজুন।",
-    intro: "কন্নড়, বাংলা ও ওড়িয়া নামের সীমিত রূপ তৈরি করে আঠারোটি পর্যন্ত মানব-নিয়ন্ত্রিত অনুসন্ধান চেষ্টা করুন।",
+    intro: "কন্নড়, বাংলা, ওড়িয়া ও হিন্দি নামের সীমিত রূপ তৈরি করে আঠারোটি পর্যন্ত মানব-নিয়ন্ত্রিত অনুসন্ধান চেষ্টা করুন।",
     steps: ["বিবরণ", "বানান", "CAPTCHA", "মিল"],
     trust: ["প্রতিটি CAPTCHA আপনি নিজে পড়ে লিখবেন।", "প্রতি কেসে আঠারোটি পর্যন্ত নিয়ন্ত্রিত অনুসন্ধান।", "সম্পূর্ণ ভোটার রেকর্ড, ইমেল বা এক্সপোর্ট নেই।"],
     section: "ধাপ ১ / ৪",
@@ -452,7 +472,7 @@ const copy = {
   or: {
     eyebrow: "ବହୁଭାଷୀ ଭୋଟର ସନ୍ଧାନ ସହାୟତା",
     title: "ଠିକ୍ ବନାନରେ ଠିକ୍ ରେକର୍ଡ ଖୋଜନ୍ତୁ।",
-    intro: "କନ୍ନଡ଼, বাংলা ଓ ଓଡ଼ିଆ ନାମର ସୀମିତ ରୂପ ପ୍ରସ୍ତୁତ କରି ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ମାନବ-ନିୟନ୍ତ୍ରିତ ସନ୍ଧାନ ଚେଷ୍ଟା କରନ୍ତୁ।",
+    intro: "କନ୍ନଡ଼, বাংলা, ଓଡ଼ିଆ ଓ ହିନ୍ଦୀ ନାମର ସୀମିତ ରୂପ ପ୍ରସ୍ତୁତ କରି ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ମାନବ-ନିୟନ୍ତ୍ରିତ ସନ୍ଧାନ ଚେଷ୍ଟା କରନ୍ତୁ।",
     steps: ["ବିବରଣୀ", "ବନାନ", "CAPTCHA", "ମେଳ"],
     trust: ["ପ୍ରତ୍ୟେକ CAPTCHA ଆପଣ ନିଜେ ପଢ଼ିବେ।", "ପ୍ରତି କେସରେ ଅଠରଟି ପର୍ଯ୍ୟନ୍ତ ନିୟନ୍ତ୍ରିତ ସନ୍ଧାନ।", "ସମ୍ପୂର୍ଣ୍ଣ ଭୋଟର ରେକର୍ଡ କିମ୍ବା ଇମେଲ ନାହିଁ।"],
     section: "ପଦକ୍ରମ 1 / 4",
@@ -527,6 +547,14 @@ const officialStateCodes: Record<SupportedState, string> = {
   karnataka: "S10",
   west_bengal: "S25",
   odisha: "S18",
+  bihar: "S04",
+  chhattisgarh: "S26",
+  delhi: "U05",
+  jharkhand: "S27",
+  madhya_pradesh: "S12",
+  rajasthan: "S20",
+  uttar_pradesh: "S24",
+  uttarakhand: "S28",
 };
 
 function isExtensionVersionCurrent(version: string): boolean {
@@ -1126,6 +1154,7 @@ export function SearchAssistant() {
             <span className="script-pill">ಕನ್ನಡ · Kannada</span>
             <span className="script-pill">বাংলা · Bengali</span>
             <span className="script-pill">ଓଡ଼ିଆ · Odia</span>
+            <span className="script-pill">हिन्दी · Hindi</span>
           </div>
           <ul className="trust-list">
             {t.trust.map((item) => (
@@ -1518,63 +1547,6 @@ export function SearchAssistant() {
                   <span>This is a failed or expired attempt—not a zero-match response from ECI.</span>
                 </section>
               )}
-              {apiObservation && (
-                <section
-                  className={`official-api-verification ${apiCallAccepted ? "accepted" : "rejected"}`}
-                  aria-labelledby="official-api-verification-heading"
-                  data-testid="official-api-verification"
-                >
-                  <div className="official-api-verification-heading">
-                    <span className="official-api-check" aria-hidden="true">{apiCallAccepted ? "✓" : "!"}</span>
-                    <div>
-                      <p>Local network observation</p>
-                      <h2 id="official-api-verification-heading">Official API call observed</h2>
-                      <strong>
-                        {apiObservation.method} {apiObservation.endpoint.path} · {apiObservation.status === 0 ? "no HTTP status" : `HTTP ${apiObservation.status}`}
-                      </strong>
-                    </div>
-                  </div>
-                  <p className="official-api-privacy">
-                    Observed locally in this browser only after your human-entered CAPTCHA submission. The request uses an encrypted wire envelope. Only the official URL, method, status and encrypted-envelope key names appear here. No voter input, CAPTCHA or response body enters this diagnostic; the metadata is not logged, sent to SIR Assist servers or stored.
-                  </p>
-                  {!apiCallAccepted && (
-                    <p className="official-api-rejection" role="status">
-                      The API call itself was observed, but ECI did not return a successful 2xx status. This attempt is a rejected or interrupted submission—not a completed zero-result search.
-                    </p>
-                  )}
-                  <dl className="official-api-facts">
-                    <div>
-                      <dt>Official origin</dt>
-                      <dd><code>{apiObservation.endpoint.origin}</code></dd>
-                    </div>
-                    <div>
-                      <dt>Transport</dt>
-                      <dd>{apiObservation.transport === "xhr" ? "XMLHttpRequest" : "Fetch"}</dd>
-                    </div>
-                    <div>
-                      <dt>Request envelope</dt>
-                      <dd>{apiObservation.request.topLevelKeys.length} top-level keys · encrypted values withheld</dd>
-                    </div>
-                  </dl>
-                  <details className="official-api-schema">
-                    <summary>Show sanitized schema names</summary>
-                    <dl>
-                      <div>
-                        <dt>Query key names</dt>
-                        <dd>{apiObservation.endpoint.queryKeys.join(", ") || "None"}</dd>
-                      </div>
-                      <div>
-                        <dt>Request envelope key names</dt>
-                        <dd>{apiObservation.request.topLevelKeys.join(", ") || "None"}</dd>
-                      </div>
-                      <div>
-                        <dt>Request nested key names</dt>
-                        <dd>{apiObservation.request.nestedKeys.join(", ") || "None"}</dd>
-                      </div>
-                    </dl>
-                  </details>
-                </section>
-              )}
               <section
                 className={`possible-match-summary ${candidates.length > 0 ? "found" : latestFailure ? "incomplete" : "empty"}`}
                 aria-labelledby="possible-match-heading"
@@ -1615,6 +1587,63 @@ export function SearchAssistant() {
                   <a href="https://electoralsearch.eci.gov.in/" target="_blank" rel="noreferrer">
                     Verify on official ECI search
                   </a>
+                </section>
+              )}
+              {apiObservation && (
+                <section
+                  className={`official-api-verification ${apiCallAccepted ? "accepted" : "rejected"}`}
+                  aria-labelledby="official-api-verification-heading"
+                  data-testid="official-api-verification"
+                >
+                  <div className="official-api-verification-heading">
+                    <span className="official-api-check" aria-hidden="true">{apiCallAccepted ? "✓" : "!"}</span>
+                    <div>
+                      <p>Local network observation · transport diagnostic, not a search result</p>
+                      <h3 id="official-api-verification-heading">Official API call observed</h3>
+                      <strong>
+                        {apiObservation.method} {apiObservation.endpoint.path} · {apiObservation.status === 0 ? "no HTTP status" : `HTTP ${apiObservation.status}`}
+                      </strong>
+                    </div>
+                  </div>
+                  <p className="official-api-privacy">
+                    This diagnostic only confirms that the official request completed; whether the record was found is stated in the summary above. Observed locally in this browser only after your human-entered CAPTCHA submission. The request uses an encrypted wire envelope. Only the official URL, method, status and encrypted-envelope key names appear here. No voter input, CAPTCHA or response body enters this diagnostic; the metadata is not logged, sent to SIR Assist servers or stored.
+                  </p>
+                  {!apiCallAccepted && (
+                    <p className="official-api-rejection" role="status">
+                      The API call itself was observed, but ECI did not return a successful 2xx status. This attempt is a rejected or interrupted submission—not a completed zero-result search.
+                    </p>
+                  )}
+                  <dl className="official-api-facts">
+                    <div>
+                      <dt>Official origin</dt>
+                      <dd><code>{apiObservation.endpoint.origin}</code></dd>
+                    </div>
+                    <div>
+                      <dt>Transport</dt>
+                      <dd>{apiObservation.transport === "xhr" ? "XMLHttpRequest" : "Fetch"}</dd>
+                    </div>
+                    <div>
+                      <dt>Request envelope</dt>
+                      <dd>{apiObservation.request.topLevelKeys.length} top-level keys · encrypted values withheld</dd>
+                    </div>
+                  </dl>
+                  <details className="official-api-schema">
+                    <summary>Show sanitized schema names</summary>
+                    <dl>
+                      <div>
+                        <dt>Query key names</dt>
+                        <dd>{apiObservation.endpoint.queryKeys.join(", ") || "None"}</dd>
+                      </div>
+                      <div>
+                        <dt>Request envelope key names</dt>
+                        <dd>{apiObservation.request.topLevelKeys.join(", ") || "None"}</dd>
+                      </div>
+                      <div>
+                        <dt>Request nested key names</dt>
+                        <dd>{apiObservation.request.nestedKeys.join(", ") || "None"}</dd>
+                      </div>
+                    </dl>
+                  </details>
                 </section>
               )}
               <div className="search-outcome-totals" aria-label="Search outcome totals">

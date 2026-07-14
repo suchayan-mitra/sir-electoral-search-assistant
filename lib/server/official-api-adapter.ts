@@ -5,7 +5,18 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-export type SupportedState = "karnataka" | "west_bengal" | "odisha";
+export type SupportedState =
+  | "karnataka"
+  | "west_bengal"
+  | "odisha"
+  | "bihar"
+  | "chhattisgarh"
+  | "delhi"
+  | "jharkhand"
+  | "madhya_pradesh"
+  | "rajasthan"
+  | "uttar_pradesh"
+  | "uttarakhand";
 
 export type SearchRequest = {
   state: SupportedState;

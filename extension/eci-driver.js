@@ -11,10 +11,19 @@
   const protocol = globalThis.SirAssistProtocol;
   if (window.top !== window || location.origin !== protocol.ECI_ORIGIN) return;
 
+  // Codes audited from the official #stateID dropdown on 2026-07-13.
   const stateCodes = {
     karnataka: "S10",
     west_bengal: "S25",
     odisha: "S18",
+    bihar: "S04",
+    chhattisgarh: "S26",
+    delhi: "U05",
+    jharkhand: "S27",
+    madhya_pradesh: "S12",
+    rajasthan: "S20",
+    uttar_pradesh: "S24",
+    uttarakhand: "S28",
   };
   const genderCodes = { female: "F", male: "M", other: "T" };
   const districtAliases = {
@@ -22,6 +31,11 @@
     BELAGAVI: "BELGAUM",
     MYSURU: "MYSORE",
     SHIVAMOGGA: "SHIMOGA",
+    ALLAHABAD: "PRAYAGRAJ",
+    FAIZABAD: "AYODHYA",
+    BANARAS: "VARANASI",
+    BENARES: "VARANASI",
+    HOSHANGABAD: "NARMADAPURAM",
   };
   let activeRequestId = "";
   let phase = "idle";
