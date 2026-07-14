@@ -74,7 +74,7 @@ test("build contains the SIR Assist product shell and extension-only search rout
   assert.match(assistant, /Continue anyway: \$\{formatBirthCriterion\(nextAttempt\.birth\)\}/);
   assert.match(assistant, /nextAttempt\.name\} · relative \{nextAttempt\.relativeName/);
   assert.match(assistant, /sir-assist-browser-companion\.zip/);
-  assert.match(assistant, /minimumExtensionVersion = "1\.5\.0"/);
+  assert.match(assistant, /minimumExtensionVersion = "1\.6\.0"/);
   assert.match(assistant, /Show a new CAPTCHA/);
   assert.match(assistant, /type: "REFRESH_CAPTCHA", requestId: caseId/);
   assert.match(assistant, /RATE_LIMIT_COOLDOWN_MS = 60_000/);

@@ -540,7 +540,7 @@ const defaultForm: FormData = {
   district: "",
 };
 
-const minimumExtensionVersion = "1.5.0";
+const minimumExtensionVersion = "1.6.0";
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
 const officialStateCodes: Record<SupportedState, string> = {

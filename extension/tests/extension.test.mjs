@@ -10,7 +10,7 @@ test("manifest is limited to SIR Assist and the official ECI origin", async () =
   const manifest = JSON.parse(await read("manifest.json"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.name, "SIR Assist Browser Companion");
-  assert.equal(manifest.version, "1.5.0");
+  assert.equal(manifest.version, "1.6.0");
   assert.equal(manifest.minimum_chrome_version, "111");
   assert.equal(
     manifest.homepage_url,
@@ -160,5 +160,5 @@ test("downloadable companion is an allowlisted GPL source archive", async () => 
   assert.match(strFromU8(files["README.md"]), /development assistance from \*\*AI Copilot\*\*/);
   assert.match(strFromU8(files["background.js"]), /Copyright \(C\) 2026 Suchayan Mitra/);
   assert.match(strFromU8(files["background.js"]), /Development assistance: AI Copilot/);
-  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.5.0");
+  assert.equal(JSON.parse(strFromU8(files["manifest.json"])).version, "1.6.0");
 });
